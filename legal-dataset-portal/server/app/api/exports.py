@@ -1,9 +1,10 @@
 import io
+import csv
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-import pandas as pd
-import json
+from openpyxl import Workbook
 
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -133,30 +134,50 @@ def export_dataset(
     else:
         raise HTTPException(status_code=400, detail="Invalid export type")
 
-    df = pd.DataFrame(data)
-
     if export_format == "csv":
         stream = io.StringIO()
-        df.to_csv(stream, index=False)
+        if data:
+            writer = csv.DictWriter(stream, fieldnames=list(data[0].keys()))
+            writer.writeheader()
+            writer.writerows(data)
+        else:
+            writer = csv.writer(stream)
+            writer.writerow(["No Data"])
+        
         response = StreamingResponse(
             io.BytesIO(stream.getvalue().encode("utf-8")),
             media_type="text/csv"
         )
         response.headers["Content-Disposition"] = f"attachment; filename={export_type}_export.csv"
         return response
+
     elif export_format == "excel":
+        wb = Workbook()
+        ws = wb.active
+        ws.title = export_type.title()
+        
+        if data:
+            headers = list(data[0].keys())
+            ws.append(headers)
+            for row in data:
+                ws.append([row.get(h) for h in headers])
+        else:
+            ws.append(["No Data"])
+            
         stream = io.BytesIO()
-        with pd.ExcelWriter(stream, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name=export_type.title())
+        wb.save(stream)
+        stream.seek(0)
+        
         response = StreamingResponse(
-            io.BytesIO(stream.getvalue()),
+            stream,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         response.headers["Content-Disposition"] = f"attachment; filename={export_type}_export.xlsx"
         return response
+
     elif export_format == "json":
         stream = io.BytesIO()
-        df_json = df.to_json(orient="records", indent=2)
+        df_json = json.dumps(data, indent=2, default=str)
         stream.write(df_json.encode("utf-8"))
         stream.seek(0)
         response = StreamingResponse(
