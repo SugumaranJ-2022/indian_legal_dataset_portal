@@ -491,14 +491,39 @@ const DocumentCollection: React.FC = () => {
                     <p className="font-semibold text-slate-700 mt-0.5">{selectedDoc.category}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year</span>
-                    <p className="font-semibold text-slate-700 mt-0.5">{selectedDoc.year}</p>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year / Version</span>
+                    <p className="font-semibold text-slate-700 mt-0.5">{selectedDoc.year} (v{selectedDoc.version})</p>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Language</span>
                     <p className="font-semibold text-slate-700 mt-0.5">{selectedDoc.language}</p>
                   </div>
                 </div>
+
+                {/* File Details Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/60 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Page Count</span>
+                    <p className="font-semibold text-slate-700 mt-0.5">{selectedDoc.page_count ? `${selectedDoc.page_count} pages` : 'Pending calculation'}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">File Size</span>
+                    <p className="font-semibold text-slate-700 mt-0.5">
+                      {selectedDoc.file_size ? `${(selectedDoc.file_size / 1024 / 1024).toFixed(2)} MB` : 'Pending upload'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MIME Type</span>
+                    <p className="font-semibold text-slate-700 mt-0.5">{selectedDoc.file_type || 'PDF'}</p>
+                  </div>
+                </div>
+
+                {selectedDoc.file_hash && (
+                  <div className="text-xs bg-slate-50 p-4 rounded-xl border border-slate-200/60">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SHA-256 Binary Checksum</span>
+                    <p className="font-mono text-slate-700 mt-0.5 break-all select-all">{selectedDoc.file_hash}</p>
+                  </div>
+                )}
 
                 {/* URL and source */}
                 <div className="text-xs space-y-1.5 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
@@ -690,6 +715,47 @@ const DocumentCollection: React.FC = () => {
                 <div className="bg-red-500/10 border border-red-500/20 text-red-600 p-3 rounded-xl text-xs flex gap-2 items-center">
                   <AlertCircle size={14} className="shrink-0" />
                   <span>{formError}</span>
+                </div>
+              )}
+
+              {documents.filter(d => d.filename === 'pending_upload.pdf').length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4 text-xs">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                    Fulfill Seeded Candidate Act? (Optional)
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      const docId = e.target.value;
+                      if (!docId) {
+                        setDocCode('');
+                        setTitle('');
+                        setYear(new Date().getFullYear());
+                        setCategory('Acts / Statutes');
+                        setAuthority('');
+                        setLanguage('English');
+                        setSourceUrl('');
+                        setSourceId('');
+                        return;
+                      }
+                      const candidate = documents.find(d => d.id === Number(docId));
+                      if (candidate) {
+                        setDocCode(candidate.document_code);
+                        setTitle(candidate.title);
+                        setYear(candidate.year);
+                        setCategory(candidate.category);
+                        setAuthority(candidate.authority);
+                        setLanguage(candidate.language);
+                        setSourceUrl(candidate.source_url);
+                        setSourceId(candidate.source_id || '');
+                      }
+                    }}
+                    className="w-full bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Select Candidate to Auto-fill Form --</option>
+                    {documents.filter(d => d.filename === 'pending_upload.pdf').map(c => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))}
+                  </select>
                 </div>
               )}
 

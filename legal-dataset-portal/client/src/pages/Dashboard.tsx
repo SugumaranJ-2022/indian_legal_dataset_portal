@@ -7,7 +7,8 @@ import {
   CopyMinus,
   Loader2,
   Calendar,
-  RefreshCw
+  RefreshCw,
+  Gavel
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -367,6 +368,70 @@ const Dashboard: React.FC = () => {
             description={card.description}
           />
         ))}
+      </div>
+      {/* Disclaimer Banner */}
+      <div className="mb-8 p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-start gap-3 select-none">
+        <AlertCircle className="text-blue-500 shrink-0 mt-0.5" size={20} />
+        <div>
+          <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Research disclaimer & scope</h4>
+          <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+            This portal is a mock research database created as an educational tool for internship task validation. All seeded contents, documents, metadata indices, and AI summary logs are simulated for research audit network testing purposes.
+          </p>
+        </div>
+      </div>
+
+      {/* 10 Research Rules for Data Collection */}
+      <div className="glass-panel p-6 rounded-2xl shadow-md mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Gavel className="text-teal-600 stroke-[2.5]" size={18} />
+          <div>
+            <h4 className="text-sm font-bold text-slate-800 tracking-tight uppercase">Internship Task 1 — 10 Research Rules</h4>
+            <p className="text-[10px] text-slate-400 font-semibold tracking-wide uppercase mt-0.5">Mandatory procedures for legal dataset collection</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 1: Domain Check</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Identify official legal-data domains (.gov.in / .nic.in / main.sci.gov.in).</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 2: Citation Accuracy</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Capture document citation metadata accurately (CNR, Case Numbers, Acts, Dates).</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 3: Upload Limits</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Enforce strict file size verification limits (&lt; 15MB) on PDF uploads.</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 4: SHA-256 Hashing</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Verify SHA-256 file hashes to prevent exact-binary duplicate uploads.</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 5: Text Readability</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Audit text layout readabilities (ensure ASCII character extractions are healthy).</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 6: Binary Integrity</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Lock original PDF document binaries from modification, renaming, or corruption.</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 7: Granular Auditing</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Enforce 13-point quality checklists before marking a record as verified.</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 8: De-duplication</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Cross-reference duplicate warnings in the de-duplication panel prior to merging.</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 9: Auditable History</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Maintain action audit logs for every system creation, modification, or deletion.</p>
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
+            <span className="font-bold text-teal-600">Rule 10: Official Formats</span>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Compile telemetry exports only in official CSV, Excel, and JSON formats.</p>
+          </div>
+        </div>
       </div>
 
       {/* Dynamic Portal Charts Grid */}

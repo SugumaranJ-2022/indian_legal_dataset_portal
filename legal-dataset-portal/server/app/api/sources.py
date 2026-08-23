@@ -5,7 +5,7 @@ from sqlalchemy import or_
 
 from app.core.database import get_db
 from app.api.deps import get_current_user, RoleChecker
-from app.models.models import User, Source
+from app.models.models import User, Source, AuditLog
 from app.schemas.schemas import SourceCreate, SourceUpdate, SourceResponse
 from app.core.websocket import broadcast_sync
 
@@ -14,7 +14,19 @@ router = APIRouter()
 # Allow both researchers and reviewers/admins to read sources
 read_checker = Depends(get_current_user)
 # Allow only reviewers/admins to modify sources (RBAC ready)
-write_checker = Depends(RoleChecker(allowed_roles=["admin", "reviewer", "researcher"])) # For now allow researcher to write too since they are single-user
+write_checker = Depends(RoleChecker(allowed_roles=["admin", "reviewer", "researcher"]))
+
+def log_audit(db: Session, email: str, action: str, entity: str, entity_id: int, prev: str = None, new: str = None):
+    audit_entry = AuditLog(
+        user_email=email,
+        action=action,
+        entity=entity,
+        entity_id=entity_id,
+        previous_value=prev,
+        new_value=new
+    )
+    db.add(audit_entry)
+    db.commit()
 
 @router.get("", response_model=List[SourceResponse])
 def get_sources(
@@ -37,6 +49,7 @@ def get_sources(
         search_filter = or_(
             Source.website_name.ilike(f"%{search}%"),
             Source.authority.ilike(f"%{search}%"),
+            Source.organization.ilike(f"%{search}%"),
             Source.notes.ilike(f"%{search}%")
         )
         query = query.filter(search_filter)
@@ -52,11 +65,16 @@ def get_sources(
                 id=source.id,
                 website_name=source.website_name,
                 authority=source.authority,
+                organization=source.organization,
                 category=source.category,
                 source_type=source.source_type,
+                legal_information_type=source.legal_information_type,
                 languages=langs,
                 download_available=source.download_available,
                 website_url=source.website_url,
+                reliability_level=source.reliability_level,
+                verification_status=source.verification_status,
+                description=source.description,
                 notes=source.notes
             )
         )
@@ -71,27 +89,41 @@ def create_source(
     source = Source(
         website_name=source_in.website_name,
         authority=source_in.authority,
+        organization=source_in.organization,
         category=source_in.category,
         source_type=source_in.source_type,
+        legal_information_type=source_in.legal_information_type,
         languages=",".join(source_in.languages),
         download_available=source_in.download_available,
         website_url=source_in.website_url,
+        reliability_level=source_in.reliability_level,
+        verification_status=source_in.verification_status,
+        description=source_in.description,
         notes=source_in.notes
     )
     db.add(source)
     db.commit()
     db.refresh(source)
+    
+    # Log Audit action
+    log_audit(db, current_user.email, "Source added", "Source", source.id, None, source.website_name)
+    
     broadcast_sync({"event": "source_created"})
     
     return SourceResponse(
         id=source.id,
         website_name=source.website_name,
         authority=source.authority,
+        organization=source.organization,
         category=source.category,
         source_type=source.source_type,
+        legal_information_type=source.legal_information_type,
         languages=source.languages.split(",") if source.languages else [],
         download_available=source.download_available,
         website_url=source.website_url,
+        reliability_level=source.reliability_level,
+        verification_status=source.verification_status,
+        description=source.description,
         notes=source.notes
     )
 
@@ -109,6 +141,8 @@ def update_source(
             detail=f"Source with id {source_id} not found"
         )
         
+    prev_val = f"Name: {source.website_name}, Reliability: {source.reliability_level}"
+    
     update_data = source_in.dict(exclude_unset=True)
     for field, value in update_data.items():
         if field == "languages":
@@ -118,17 +152,26 @@ def update_source(
             
     db.commit()
     db.refresh(source)
+    
+    # Log Audit action
+    log_audit(db, current_user.email, "Source updated", "Source", source.id, prev_val, f"Name: {source.website_name}, Reliability: {source.reliability_level}")
+    
     broadcast_sync({"event": "source_updated", "source_id": source_id})
     
     return SourceResponse(
         id=source.id,
         website_name=source.website_name,
         authority=source.authority,
+        organization=source.organization,
         category=source.category,
         source_type=source.source_type,
+        legal_information_type=source.legal_information_type,
         languages=source.languages.split(",") if source.languages else [],
         download_available=source.download_available,
         website_url=source.website_url,
+        reliability_level=source.reliability_level,
+        verification_status=source.verification_status,
+        description=source.description,
         notes=source.notes
     )
 
@@ -138,12 +181,23 @@ def delete_source(
     db: Session = Depends(get_db),
     current_user: User = write_checker
 ):
+    # Restrict deletion to Admin
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete source records"
+        )
+
     source = db.query(Source).filter(Source.id == source_id).first()
     if not source:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Source with id {source_id} not found"
         )
+        
+    # Log Audit action
+    log_audit(db, current_user.email, "Source deleted", "Source", source_id, source.website_name, None)
+    
     db.delete(source)
     db.commit()
     broadcast_sync({"event": "source_deleted", "source_id": source_id})

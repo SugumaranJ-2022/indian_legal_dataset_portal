@@ -1,6 +1,7 @@
 import os
 import shutil
 import re
+import hashlib
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
@@ -10,11 +11,38 @@ from sqlalchemy import or_
 from app.core.config import settings
 from app.core.database import get_db
 from app.api.deps import get_current_user
-from app.models.models import User, Document, QualityCheck, Duplicate, Source, CourtMetadata, Annotation
+from app.models.models import User, Document, QualityCheck, Duplicate, Source, CourtMetadata, Annotation, AuditLog
 from app.schemas.schemas import DocumentResponse, DocumentUpdate, AnnotationCreate, AnnotationResponse
 from app.core.websocket import broadcast_sync
 
 router = APIRouter()
+
+def log_audit(db: Session, email: str, action: str, entity: str, entity_id: int, prev: str = None, new: str = None):
+    audit_entry = AuditLog(
+        user_email=email,
+        action=action,
+        entity=entity,
+        entity_id=entity_id,
+        previous_value=prev,
+        new_value=new
+    )
+    db.add(audit_entry)
+    db.commit()
+
+def count_pdf_pages(file_path: str) -> int:
+    try:
+        with open(file_path, "rb") as f:
+            content = f.read()
+        # Search for page marker /Type /Page
+        pages = re.findall(b"/Type\s*/Page\b", content)
+        if pages:
+            return len(pages)
+        matches = re.findall(b"/Count\s+(\d+)", content)
+        if matches:
+            return max(int(m) for m in matches)
+        return 1
+    except Exception:
+        return 1
 
 @router.get("", response_model=List[DocumentResponse])
 def get_documents(
@@ -42,7 +70,11 @@ def get_documents(
             Document.document_code.ilike(f"%{search}%"),
             Document.notes.ilike(f"%{search}%"),
             Document.filename.ilike(f"%{search}%"),
-            Document.text_content.ilike(f"%{search}%")
+            Document.text_content.ilike(f"%{search}%"),
+            Document.court_name.ilike(f"%{search}%"),
+            Document.cnr_number.ilike(f"%{search}%"),
+            Document.case_number.ilike(f"%{search}%"),
+            Document.judges.ilike(f"%{search}%")
         )
         query = query.filter(search_filter)
 
@@ -76,6 +108,7 @@ def get_document(
         )
     return document
 
+
 def extract_pdf_ascii_text(file_path: str) -> str:
     """Extract readable ASCII text blocks from PDF binary directly without external wheels."""
     try:
@@ -88,6 +121,7 @@ def extract_pdf_ascii_text(file_path: str) -> str:
     except Exception as e:
         print(f"Error scanning PDF text: {str(e)}")
         return ""
+
 
 def generate_mock_ai_summary(document: Document, text: str) -> str:
     citations = []
@@ -145,6 +179,7 @@ This document is classified under **{document.category}**, published by **{docum
 """
     return summary.strip()
 
+
 def run_automated_audit(document: Document, file_path: str, db: Session):
     """Scan document file, perform simulated AI quality checks, and auto-populate court CNR metadata."""
     text = extract_pdf_ascii_text(file_path)
@@ -165,7 +200,7 @@ def run_automated_audit(document: Document, file_path: str, db: Session):
     # 3. Duplicate listing check
     has_duplicate = db.query(Document).filter(
         (Document.id != document.id) & 
-        ((Document.title.ilike(document.title)) | (Document.filename == document.filename))
+        ((Document.file_hash == document.file_hash) | (Document.title.ilike(document.title)) | (Document.filename == document.filename))
     ).first() is not None
 
     # 4. Extract CNR and Court details automatically from text
@@ -179,6 +214,12 @@ def run_automated_audit(document: Document, file_path: str, db: Session):
     judge = judge_match.group(2).strip() if judge_match else None
 
     court = "Supreme Court of India" if "supreme court" in text.lower() else ("Delhi High Court" if "delhi high court" in text.lower() else "District Court Registry")
+
+    # Sync Document metadata
+    document.court_name = court
+    document.cnr_number = cnr_number or document.cnr_number
+    document.case_number = case_number or document.case_number
+    document.judges = judge or document.judges
 
     # Save CourtMetadata
     if cnr_number or case_number or court != "District Court Registry":
@@ -204,15 +245,27 @@ def run_automated_audit(document: Document, file_path: str, db: Session):
     qc = db.query(QualityCheck).filter(QualityCheck.document_id == document.id).first()
     if qc:
         qc.official_source = is_official
+        qc.correct_title = len(document.title) > 3
+        qc.correct_authority = len(document.authority) > 3
+        qc.correct_year = document.year > 1800
+        qc.correct_language = len(document.language) > 2
         qc.readable = is_readable
         qc.complete_content = is_complete
-        qc.metadata_correct = True
+        qc.no_missing_pages = is_complete
+        qc.pdf_opens_correctly = True
+        qc.no_obvious_corruption = True
+        qc.not_duplicate = not has_duplicate
+        qc.metadata_complete = all([document.title, document.category, document.authority, document.source_url])
+        qc.exact_source_url_recorded = bool(document.source_url)
         qc.duplicate_checked = not has_duplicate
         qc.version_verified = True
-        qc.verification_status = "Verified" if (is_official and is_readable and not has_duplicate) else "Needs Review"
+        
+        qc.verification_status = "Verified" if (is_official and is_readable and not has_duplicate and qc.metadata_complete) else "Needs Review"
         
         # Sync document general status
         document.status = "Verified" if qc.verification_status == "Verified" else "Needs Review"
+        document.quality_status = "Healthy" if is_readable else "Needs Review"
+
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 def upload_document(
@@ -231,70 +284,127 @@ def upload_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Check if document code already exists
-    existing = db.query(Document).filter(Document.document_code == document_code).first()
-    if existing:
+    # Enforce file validations
+    if not file.filename.lower().endswith(".pdf") or file.content_type != "application/pdf":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Document with code {document_code} already exists"
+            detail="Invalid file type. Only PDF documents are supported."
         )
 
     # Clean filename and build file path
     safe_filename = "".join(c for c in file.filename if c.isalnum() or c in (".", "_", "-")).strip()
-    # Save file to uploads folder
     file_path = os.path.join(settings.UPLOAD_DIR, safe_filename)
-    
+
     # Save file contents
     try:
+        file_bytes = file.file.read()
+        file_size = len(file_bytes)
+
+        # Enforce size limit (15MB)
+        if file_size > 15 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File size exceeds the maximum limit of 15MB"
+            )
+
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(file_bytes)
+        file.file.seek(0)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Could not save file: {str(e)}"
         )
 
-    # Create document record
-    document = Document(
-        document_code=document_code,
-        title=title,
-        year=year,
-        category=category,
-        authority=authority,
-        language=language,
-        source_id=source_id,
-        source_url=source_url,
-        filename=safe_filename,
-        version=version,
-        status=status_val,
-        notes=notes
-    )
-    db.add(document)
+    # Calculate file SHA-256 hash
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    page_count = count_pdf_pages(file_path)
+
+    # Check if document code already exists
+    existing = db.query(Document).filter(Document.document_code == document_code).first()
+    
+    if existing:
+        if existing.filename == "pending_upload.pdf":
+            # This is a pre-seeded candidate Act, update it!
+            document = existing
+            document.title = title
+            document.year = year
+            document.category = category
+            document.authority = authority
+            document.language = language
+            document.source_id = source_id
+            document.source_url = source_url
+            document.filename = safe_filename
+            document.file_size = file_size
+            document.file_hash = file_hash
+            document.page_count = page_count
+            document.file_path = file_path
+            document.notes = notes
+            document.status = "Needs Review"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Document with code {document_code} already exists"
+            )
+    else:
+        # Create new document record
+        document = Document(
+            document_code=document_code,
+            title=title,
+            year=year,
+            category=category,
+            authority=authority,
+            language=language,
+            source_id=source_id,
+            source_url=source_url,
+            filename=safe_filename,
+            file_size=file_size,
+            file_hash=file_hash,
+            page_count=page_count,
+            file_path=file_path,
+            version=version,
+            status=status_val,
+            notes=notes,
+            created_by=current_user.email
+        )
+        db.add(document)
+    
     db.commit()
     db.refresh(document)
 
     # Initialize default Quality Checklist
-    qc = QualityCheck(
-        document_id=document.id,
-        official_source=False,
-        readable=True,
-        complete_content=False,
-        metadata_correct=False,
-        duplicate_checked=False,
-        version_verified=False,
-        verification_status="Needs Review"
-    )
-    db.add(qc)
-    db.commit()
+    qc = db.query(QualityCheck).filter(QualityCheck.document_id == document.id).first()
+    if not qc:
+        qc = QualityCheck(
+            document_id=document.id,
+            official_source=False,
+            correct_title=False,
+            correct_authority=False,
+            correct_year=False,
+            correct_language=False,
+            complete_content=False,
+            no_missing_pages=False,
+            readable=False,
+            pdf_opens_correctly=False,
+            no_obvious_corruption=False,
+            not_duplicate=False,
+            metadata_complete=False,
+            exact_source_url_recorded=False,
+            duplicate_checked=False,
+            version_verified=False,
+            verification_status="Needs Review"
+        )
+        db.add(qc)
+        db.commit()
 
     # Seed potential duplicates records first
     potential_duplicates = db.query(Document).filter(
         (Document.id != document.id) & 
-        ((Document.title.ilike(title)) | (Document.filename == safe_filename))
+        ((Document.file_hash == file_hash) | (Document.title.ilike(title)) | (Document.filename == safe_filename))
     ).all()
 
     for dup in potential_duplicates:
-        reason = f"Matches existing document '{dup.title}' (ID: {dup.document_code}) by title or filename"
+        reason = f"Matches existing document '{dup.title}' (ID: {dup.document_code}) by file hash, title, or filename"
         duplicate_entry = Duplicate(
             document_id=document.id,
             duplicate_document_id=dup.id,
@@ -303,6 +413,8 @@ def upload_document(
             status="Pending"
         )
         db.add(duplicate_entry)
+        document.duplicate_status = "Duplicate"
+        
     db.commit()
 
     # Trigger Automated AI Auditing & Court Metadata Extraction
@@ -313,8 +425,13 @@ def upload_document(
         print(f"Failed to execute automated legal document audit: {str(audit_err)}")
 
     db.refresh(document)
+    
+    # Log Audit action
+    log_audit(db, current_user.email, "Document uploaded", "Document", document.id, None, f"Code: {document.document_code}, Title: {document.title}")
+    
     broadcast_sync({"event": "document_created"})
     return document
+
 
 @router.put("/{document_id}", response_model=DocumentResponse)
 def update_document(
@@ -330,14 +447,20 @@ def update_document(
             detail=f"Document with id {document_id} not found"
         )
         
+    prev_val = f"Status: {document.status}, Title: {document.title}"
     update_data = document_in.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(document, field, value)
             
     db.commit()
     db.refresh(document)
+    
+    # Log Audit action
+    log_audit(db, current_user.email, "Document updated", "Document", document.id, prev_val, f"Status: {document.status}, Title: {document.title}")
+    
     broadcast_sync({"event": "document_updated", "document_id": document_id})
     return document
+
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
@@ -345,6 +468,13 @@ def delete_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Restrict deletion to Admin
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete document records"
+        )
+
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(
@@ -352,18 +482,23 @@ def delete_document(
             detail=f"Document with id {document_id} not found"
         )
     
-    # Remove file from uploads folder
-    file_path = os.path.join(settings.UPLOAD_DIR, document.filename)
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception:
-            pass # Continue even if file delete fails
+    # Remove file from uploads folder if it's not the seed placeholder
+    if document.filename != "pending_upload.pdf":
+        file_path = os.path.join(settings.UPLOAD_DIR, document.filename)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception:
+                pass
             
+    # Log Audit action
+    log_audit(db, current_user.email, "Document deleted", "Document", document_id, f"Code: {document.document_code}, Title: {document.title}", None)
+    
     db.delete(document)
     db.commit()
     broadcast_sync({"event": "document_deleted", "document_id": document_id})
     return None
+
 
 @router.get("/{document_id}/annotations", response_model=List[AnnotationResponse])
 def get_document_annotations(
@@ -375,6 +510,7 @@ def get_document_annotations(
         Annotation.document_id == document_id
     ).order_by(Annotation.page_number.asc(), Annotation.created_at.desc()).all()
     return annotations
+
 
 @router.post("/{document_id}/annotations", response_model=AnnotationResponse, status_code=status.HTTP_201_CREATED)
 def create_document_annotation(
@@ -397,8 +533,12 @@ def create_document_annotation(
     db.commit()
     db.refresh(new_annotation)
     
+    # Log Audit action
+    log_audit(db, current_user.email, "Annotation added", "Document", document_id, None, annotation.text)
+    
     broadcast_sync({"event": "document_updated", "document_id": document_id})
     return new_annotation
+
 
 @router.delete("/{document_id}/annotations/{annotation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document_annotation(
@@ -414,9 +554,11 @@ def delete_document_annotation(
     if not annotation:
         raise HTTPException(status_code=404, detail="Annotation not found")
     
+    # Log Audit action
+    log_audit(db, current_user.email, "Annotation deleted", "Document", document_id, annotation.text, None)
+    
     db.delete(annotation)
     db.commit()
     
     broadcast_sync({"event": "document_updated", "document_id": document_id})
     return None
-

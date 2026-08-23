@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.security import get_password_hash
 from app.models.models import User, Source, Document, QualityCheck, Duplicate, CourtMetadata
-from app.api import auth, sources, documents, quality, duplicates, court_metadata, reports, dashboard
+from app.api import auth, sources, documents, quality, duplicates, court_metadata, reports, dashboard, audit, exports
 from app.core.websocket import manager
 
 # Create all database tables
@@ -17,28 +17,75 @@ Base.metadata.create_all(bind=engine)
 
 # Dynamic Migration for existing DB
 from sqlalchemy import text
+
+migrations = {
+    "sources": [
+        ("organization", "VARCHAR"),
+        ("legal_information_type", "VARCHAR"),
+        ("reliability_level", "VARCHAR DEFAULT 'Needs Review'"),
+        ("verification_status", "VARCHAR DEFAULT 'Pending'"),
+        ("description", "TEXT"),
+        ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+        ("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    ],
+    "documents": [
+        ("subcategory", "VARCHAR"),
+        ("ministry_department", "VARCHAR"),
+        ("file_type", "VARCHAR DEFAULT 'PDF'"),
+        ("file_size", "INTEGER"),
+        ("file_hash", "VARCHAR"),
+        ("page_count", "INTEGER"),
+        ("document_date", "DATE"),
+        ("act_number", "VARCHAR"),
+        ("case_number", "VARCHAR"),
+        ("cnr_number", "VARCHAR"),
+        ("court_name", "VARCHAR"),
+        ("judges", "VARCHAR"),
+        ("download_date", "DATE"),
+        ("quality_status", "VARCHAR DEFAULT 'Pending'"),
+        ("duplicate_status", "VARCHAR DEFAULT 'Not Duplicate'"),
+        ("missing_pages_status", "VARCHAR DEFAULT 'No Issues'"),
+        ("readability_status", "VARCHAR DEFAULT 'Readable'"),
+        ("corruption_status", "VARCHAR DEFAULT 'Healthy'"),
+        ("file_path", "VARCHAR"),
+        ("created_by", "VARCHAR DEFAULT 'System'"),
+        ("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+    ],
+    "quality_checks": [
+        ("correct_title", "BOOLEAN DEFAULT 0"),
+        ("correct_authority", "BOOLEAN DEFAULT 0"),
+        ("correct_year", "BOOLEAN DEFAULT 0"),
+        ("correct_language", "BOOLEAN DEFAULT 0"),
+        ("no_missing_pages", "BOOLEAN DEFAULT 0"),
+        ("pdf_opens_correctly", "BOOLEAN DEFAULT 0"),
+        ("no_obvious_corruption", "BOOLEAN DEFAULT 0"),
+        ("not_duplicate", "BOOLEAN DEFAULT 0"),
+        ("metadata_complete", "BOOLEAN DEFAULT 0"),
+        ("exact_source_url_recorded", "BOOLEAN DEFAULT 0")
+    ],
+    "court_metadata": [
+        ("registration_date", "DATE"),
+        ("judgment_order_date", "DATE"),
+        ("source", "VARCHAR"),
+        ("source_url", "VARCHAR"),
+        ("language", "VARCHAR"),
+        ("verification_status", "VARCHAR DEFAULT 'Pending'"),
+        ("notes", "TEXT")
+    ]
+}
+
 with engine.connect() as conn:
-    # Check text_content column
-    try:
-        conn.execute(text("SELECT text_content FROM documents LIMIT 1"))
-    except Exception:
-        try:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN text_content TEXT"))
-            conn.commit()
-            print("Migration: Added text_content to documents table")
-        except Exception as e:
-            print(f"Migration text_content error: {e}")
-    
-    # Check ai_summary column
-    try:
-        conn.execute(text("SELECT ai_summary FROM documents LIMIT 1"))
-    except Exception:
-        try:
-            conn.execute(text("ALTER TABLE documents ADD COLUMN ai_summary TEXT"))
-            conn.commit()
-            print("Migration: Added ai_summary to documents table")
-        except Exception as e:
-            print(f"Migration ai_summary error: {e}")
+    for table_name, cols in migrations.items():
+        for col_name, col_type in cols:
+            try:
+                conn.execute(text(f"SELECT {col_name} FROM {table_name} LIMIT 1"))
+            except Exception:
+                try:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+                    print(f"Migration: Added {col_name} to {table_name} table")
+                except Exception as e:
+                    print(f"Migration error for {table_name}.{col_name}: {e}")
 
 def seed_database(db: Session):
     # 1. Seed researcher user
@@ -83,42 +130,58 @@ def seed_database(db: Session):
             Source(
                 website_name="India Code Portal",
                 authority="Legislative Department, Ministry of Law & Justice",
+                organization="Ministry of Law & Justice",
                 category="Acts",
-                source_type="Official",
+                source_type="Government",
+                legal_information_type="Acts, Statutes",
                 languages="English,Hindi",
                 download_available=True,
                 website_url="https://www.indiacode.nic.in",
-                notes="Central repository of all Indian Central Acts and Statutes."
+                reliability_level="Authoritative",
+                verification_status="Verified",
+                description="Central repository of all Indian Central Acts and Statutes."
             ),
             Source(
                 website_name="Gazette of India",
                 authority="Department of Publication, Ministry of Housing & Urban Affairs",
+                organization="Ministry of Housing & Urban Affairs",
                 category="Rules",
-                source_type="Official",
+                source_type="Government",
+                legal_information_type="Rules, Regulations",
                 languages="English,Hindi",
                 download_available=True,
                 website_url="https://egazette.gov.in",
-                notes="Official gazette publication for notifications, rules, and regulations."
+                reliability_level="Authoritative",
+                verification_status="Verified",
+                description="Official gazette publication for notifications, rules, and regulations."
             ),
             Source(
                 website_name="Supreme Court e-Courts Portal",
                 authority="Supreme Court of India",
+                organization="Supreme Court of India",
                 category="Judgments",
-                source_type="Official",
+                source_type="Supreme Court",
+                legal_information_type="Judgments, Orders",
                 languages="English",
                 download_available=True,
                 website_url="https://main.sci.gov.in",
-                notes="Official judgment reporting engine for Supreme Court decisions."
+                reliability_level="Authoritative",
+                verification_status="Verified",
+                description="Official judgment reporting engine for Supreme Court decisions."
             ),
             Source(
                 website_name="Delhi High Court Registry",
                 authority="Delhi High Court",
+                organization="Delhi High Court",
                 category="Metadata",
-                source_type="Official",
+                source_type="High Court",
+                legal_information_type="Metadata",
                 languages="English",
                 download_available=True,
                 website_url="https://delhihighcourt.nic.in",
-                notes="Delhi High Court case filing registry statistics."
+                reliability_level="Authoritative",
+                verification_status="Verified",
+                description="Delhi High Court case filing registry statistics."
             )
         ]
         for src in sources_list:
@@ -224,12 +287,12 @@ def seed_database(db: Session):
 
         # 4. Seed Quality Checks
         qc_list = [
-            QualityCheck(document_id=doc_const.id, official_source=True, readable=True, complete_content=True, metadata_correct=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
-            QualityCheck(document_id=doc_it.id, official_source=True, readable=True, complete_content=True, metadata_correct=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
-            QualityCheck(document_id=doc_rules.id, official_source=True, readable=True, complete_content=False, metadata_correct=True, duplicate_checked=False, version_verified=False, verification_status="Needs Review"),
-            QualityCheck(document_id=doc_kb.id, official_source=True, readable=True, complete_content=True, metadata_correct=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
-            QualityCheck(document_id=doc_akg.id, official_source=True, readable=True, complete_content=True, metadata_correct=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
-            QualityCheck(document_id=doc_dup.id, official_source=True, readable=True, complete_content=True, metadata_correct=True, duplicate_checked=True, version_verified=True, verification_status="Duplicate")
+            QualityCheck(document_id=doc_const.id, official_source=True, correct_title=True, correct_authority=True, correct_year=True, correct_language=True, complete_content=True, no_missing_pages=True, readable=True, pdf_opens_correctly=True, no_obvious_corruption=True, not_duplicate=True, metadata_complete=True, exact_source_url_recorded=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
+            QualityCheck(document_id=doc_it.id, official_source=True, correct_title=True, correct_authority=True, correct_year=True, correct_language=True, complete_content=True, no_missing_pages=True, readable=True, pdf_opens_correctly=True, no_obvious_corruption=True, not_duplicate=True, metadata_complete=True, exact_source_url_recorded=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
+            QualityCheck(document_id=doc_rules.id, official_source=True, correct_title=True, correct_authority=True, correct_year=True, correct_language=True, complete_content=False, no_missing_pages=True, readable=True, pdf_opens_correctly=True, no_obvious_corruption=True, not_duplicate=True, metadata_complete=False, exact_source_url_recorded=True, duplicate_checked=False, version_verified=False, verification_status="Needs Review"),
+            QualityCheck(document_id=doc_kb.id, official_source=True, correct_title=True, correct_authority=True, correct_year=True, correct_language=True, complete_content=True, no_missing_pages=True, readable=True, pdf_opens_correctly=True, no_obvious_corruption=True, not_duplicate=True, metadata_complete=True, exact_source_url_recorded=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
+            QualityCheck(document_id=doc_akg.id, official_source=True, correct_title=True, correct_authority=True, correct_year=True, correct_language=True, complete_content=True, no_missing_pages=True, readable=True, pdf_opens_correctly=True, no_obvious_corruption=True, not_duplicate=True, metadata_complete=True, exact_source_url_recorded=True, duplicate_checked=True, version_verified=True, verification_status="Verified"),
+            QualityCheck(document_id=doc_dup.id, official_source=True, correct_title=True, correct_authority=True, correct_year=True, correct_language=True, complete_content=True, no_missing_pages=True, readable=True, pdf_opens_correctly=True, no_obvious_corruption=True, not_duplicate=False, metadata_complete=True, exact_source_url_recorded=True, duplicate_checked=True, version_verified=True, verification_status="Duplicate")
         ]
         for qc in qc_list:
             db.add(qc)
@@ -272,6 +335,60 @@ def seed_database(db: Session):
 
         db.commit()
 
+    # 7. Seed candidate Acts
+    candidate_acts = [
+        ("Bharatiya Nyaya Sanhita, 2023", "BNS-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20062"),
+        ("Bharatiya Nagarik Suraksha Sanhita, 2023", "BNSS-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20063"),
+        ("Bharatiya Sakshya Adhiniyam, 2023", "BSA-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20064"),
+        ("Consumer Protection Act, 2019", "CPA-2019-SEED", 2019, "https://www.indiacode.nic.in/handle/123456789/15256")
+    ]
+    src_ic = db.query(Source).filter(Source.website_name == "India Code Portal").first()
+    for title, code, year, url in candidate_acts:
+        existing = db.query(Document).filter(
+            (Document.document_code == code) | (Document.title == title)
+        ).first()
+        if not existing:
+            new_doc = Document(
+                document_code=code,
+                title=title,
+                year=year,
+                category="Acts / Statutes",
+                authority="Parliament of India",
+                language="English",
+                source_id=src_ic.id if src_ic else None,
+                source_url=url,
+                filename="pending_upload.pdf",
+                status="Pending",
+                quality_status="Pending",
+                duplicate_status="Not Duplicate",
+                notes="Automated candidate seed record (Pending Verification)."
+            )
+            db.add(new_doc)
+            db.commit()
+            db.refresh(new_doc)
+            
+            qc = QualityCheck(
+                document_id=new_doc.id,
+                official_source=False,
+                correct_title=False,
+                correct_authority=False,
+                correct_year=False,
+                correct_language=False,
+                complete_content=False,
+                no_missing_pages=False,
+                readable=False,
+                pdf_opens_correctly=False,
+                no_obvious_corruption=False,
+                not_duplicate=False,
+                metadata_complete=False,
+                exact_source_url_recorded=False,
+                duplicate_checked=False,
+                version_verified=False,
+                verification_status="Pending"
+            )
+            db.add(qc)
+            db.commit()
+
 # Seed database on startup
 db_session = SessionLocal()
 try:
@@ -302,6 +419,8 @@ app.include_router(duplicates.router, prefix=f"{settings.API_V1_STR}/duplicates"
 app.include_router(court_metadata.router, prefix=f"{settings.API_V1_STR}/court-metadata", tags=["Court Metadata"])
 app.include_router(reports.router, prefix=f"{settings.API_V1_STR}/reports", tags=["Reports"])
 app.include_router(dashboard.router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["Dashboard"])
+app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit-logs", tags=["Audit Logs"])
+app.include_router(exports.router, prefix=f"{settings.API_V1_STR}/exports", tags=["Exports"])
 
 # Mount uploads static files
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

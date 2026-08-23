@@ -34,11 +34,16 @@ class UserResponse(UserBase):
 class SourceBase(BaseModel):
     website_name: str
     authority: str
+    organization: Optional[str] = None
     category: str  # Acts, Rules, Judgments, Court Metadata
-    source_type: str  # Official / Repository
-    languages: List[str]  # Will serialize to/from string in DB
+    source_type: str  # e.g., Government, Supreme Court, Regulator, Open Dataset
+    legal_information_type: Optional[str] = None
+    languages: List[str]  # e.g., ["English", "Hindi"]
     download_available: bool
     website_url: str
+    reliability_level: str = "Needs Review"  # Authoritative, Recognized, Secondary, Needs Review
+    verification_status: str = "Pending"  # Pending, Verified, Needs Review, Rejected
+    description: Optional[str] = None
     notes: Optional[str] = None
 
 class SourceCreate(SourceBase):
@@ -47,11 +52,16 @@ class SourceCreate(SourceBase):
 class SourceUpdate(BaseModel):
     website_name: Optional[str] = None
     authority: Optional[str] = None
+    organization: Optional[str] = None
     category: Optional[str] = None
     source_type: Optional[str] = None
+    legal_information_type: Optional[str] = None
     languages: Optional[List[str]] = None
     download_available: Optional[bool] = None
     website_url: Optional[str] = None
+    reliability_level: Optional[str] = None
+    verification_status: Optional[str] = None
+    description: Optional[str] = None
     notes: Optional[str] = None
 
 class SourceResponse(SourceBase):
@@ -71,10 +81,17 @@ class CourtMetadataBase(BaseModel):
     petitioner: Optional[str] = None
     respondent: Optional[str] = None
     filing_date: Optional[date] = None
+    registration_date: Optional[date] = None
     hearing_date: Optional[date] = None
     disposal_date: Optional[date] = None
+    judgment_order_date: Optional[date] = None
     judge: Optional[str] = None
     case_status: Optional[str] = None
+    source: Optional[str] = None
+    source_url: Optional[str] = None
+    language: Optional[str] = None
+    verification_status: str = "Pending"
+    notes: Optional[str] = None
 
 class CourtMetadataCreate(CourtMetadataBase):
     pass
@@ -89,9 +106,18 @@ class CourtMetadataResponse(CourtMetadataBase):
 # Quality Check Schemas
 class QualityCheckBase(BaseModel):
     official_source: bool = False
-    readable: bool = False
+    correct_title: bool = False
+    correct_authority: bool = False
+    correct_year: bool = False
+    correct_language: bool = False
     complete_content: bool = False
-    metadata_correct: bool = False
+    no_missing_pages: bool = False
+    readable: bool = False
+    pdf_opens_correctly: bool = False
+    no_obvious_corruption: bool = False
+    not_duplicate: bool = False
+    metadata_complete: bool = False
+    exact_source_url_recorded: bool = False
     duplicate_checked: bool = False
     version_verified: bool = False
     verification_status: str = "Needs Review"
@@ -101,9 +127,18 @@ class QualityCheckCreate(QualityCheckBase):
 
 class QualityCheckUpdate(BaseModel):
     official_source: Optional[bool] = None
-    readable: Optional[bool] = None
+    correct_title: Optional[bool] = None
+    correct_authority: Optional[bool] = None
+    correct_year: Optional[bool] = None
+    correct_language: Optional[bool] = None
     complete_content: Optional[bool] = None
-    metadata_correct: Optional[bool] = None
+    no_missing_pages: Optional[bool] = None
+    readable: Optional[bool] = None
+    pdf_opens_correctly: Optional[bool] = None
+    no_obvious_corruption: Optional[bool] = None
+    not_duplicate: Optional[bool] = None
+    metadata_complete: Optional[bool] = None
+    exact_source_url_recorded: Optional[bool] = None
     duplicate_checked: Optional[bool] = None
     version_verified: Optional[bool] = None
     verification_status: Optional[str] = None
@@ -121,13 +156,33 @@ class DocumentBase(BaseModel):
     title: str
     year: int
     category: str
+    subcategory: Optional[str] = None
     authority: str
+    ministry_department: Optional[str] = None
     language: str
     source_id: Optional[int] = None
     source_url: str
+    file_type: str = "PDF"
+    file_size: Optional[int] = None
+    file_hash: Optional[str] = None
+    page_count: Optional[int] = None
+    document_date: Optional[date] = None
+    act_number: Optional[str] = None
+    case_number: Optional[str] = None
+    cnr_number: Optional[str] = None
+    court_name: Optional[str] = None
+    judges: Optional[str] = None
+    download_date: Optional[date] = None
     version: str = "1.0"
     status: str = "Needs Review"
+    quality_status: str = "Pending"
+    duplicate_status: str = "Not Duplicate"
+    missing_pages_status: str = "No Issues"
+    readability_status: str = "Readable"
+    corruption_status: str = "Healthy"
     notes: Optional[str] = None
+    file_path: Optional[str] = None
+    created_by: str = "System"
 
 class DocumentCreate(DocumentBase):
     filename: str
@@ -136,18 +191,38 @@ class DocumentUpdate(BaseModel):
     title: Optional[str] = None
     year: Optional[int] = None
     category: Optional[str] = None
+    subcategory: Optional[str] = None
     authority: Optional[str] = None
+    ministry_department: Optional[str] = None
     language: Optional[str] = None
     source_id: Optional[int] = None
     source_url: Optional[str] = None
+    file_type: Optional[str] = None
+    file_size: Optional[int] = None
+    file_hash: Optional[str] = None
+    page_count: Optional[int] = None
+    document_date: Optional[date] = None
+    act_number: Optional[str] = None
+    case_number: Optional[str] = None
+    cnr_number: Optional[str] = None
+    court_name: Optional[str] = None
+    judges: Optional[str] = None
+    download_date: Optional[date] = None
     version: Optional[str] = None
     status: Optional[str] = None
+    quality_status: Optional[str] = None
+    duplicate_status: Optional[str] = None
+    missing_pages_status: Optional[str] = None
+    readability_status: Optional[str] = None
+    corruption_status: Optional[str] = None
     notes: Optional[str] = None
+    file_path: Optional[str] = None
 
 class DocumentResponse(DocumentBase):
     id: int
     filename: str
     uploaded_at: datetime
+    updated_at: datetime
     text_content: Optional[str] = None
     ai_summary: Optional[str] = None
     snippet: Optional[str] = None
@@ -210,3 +285,18 @@ class AnnotationResponse(AnnotationBase):
     class Config:
         from_attributes = True
 
+# Audit Log Schemas
+class AuditLogBase(BaseModel):
+    user_email: str
+    action: str
+    entity: str
+    entity_id: Optional[int] = None
+    timestamp: datetime
+    previous_value: Optional[str] = None
+    new_value: Optional[str] = None
+
+class AuditLogResponse(AuditLogBase):
+    id: int
+
+    class Config:
+        from_attributes = True

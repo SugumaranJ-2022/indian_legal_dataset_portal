@@ -55,6 +55,11 @@ const Sources: React.FC = () => {
   const [downloadAvailable, setDownloadAvailable] = useState(true);
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [legalInformationType, setLegalInformationType] = useState('');
+  const [reliabilityLevel, setReliabilityLevel] = useState('Needs Review');
+  const [verificationStatus, setVerificationStatus] = useState('Pending');
+  const [description, setDescription] = useState('');
 
   const fetchSources = async () => {
     setLoading(true);
@@ -85,6 +90,11 @@ const Sources: React.FC = () => {
     setDownloadAvailable(true);
     setWebsiteUrl('');
     setNotes('');
+    setOrganization('');
+    setLegalInformationType('');
+    setReliabilityLevel('Needs Review');
+    setVerificationStatus('Pending');
+    setDescription('');
     setFormError(null);
   };
 
@@ -99,6 +109,11 @@ const Sources: React.FC = () => {
     setDownloadAvailable(source.download_available);
     setWebsiteUrl(source.website_url);
     setNotes(source.notes || '');
+    setOrganization(source.organization || '');
+    setLegalInformationType(source.legal_information_type || '');
+    setReliabilityLevel(source.reliability_level || 'Needs Review');
+    setVerificationStatus(source.verification_status || 'Pending');
+    setDescription(source.description || '');
     setIsEditOpen(true);
   };
 
@@ -133,6 +148,11 @@ const Sources: React.FC = () => {
         download_available: downloadAvailable,
         website_url: websiteUrl,
         notes,
+        organization,
+        legal_information_type: legalInformationType,
+        reliability_level: reliabilityLevel,
+        verification_status: verificationStatus,
+        description,
       });
       setIsAddOpen(false);
       resetForm();
@@ -165,6 +185,11 @@ const Sources: React.FC = () => {
         download_available: downloadAvailable,
         website_url: websiteUrl,
         notes,
+        organization,
+        legal_information_type: legalInformationType,
+        reliability_level: reliabilityLevel,
+        verification_status: verificationStatus,
+        description,
       });
       setIsEditOpen(false);
       resetForm();
@@ -476,6 +501,68 @@ const Sources: React.FC = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Organization / Department</label>
+                  <input
+                    type="text"
+                    value={organization}
+                    onChange={(e) => setOrganization(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Ministry of Law & Justice"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Legal Information Type</label>
+                  <input
+                    type="text"
+                    value={legalInformationType}
+                    onChange={(e) => setLegalInformationType(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Acts, Statutes, Rules"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reliability Level</label>
+                  <select
+                    value={reliabilityLevel}
+                    onChange={(e) => setReliabilityLevel(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Authoritative">Authoritative</option>
+                    <option value="Recognized">Recognized</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Needs Review">Needs Review</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verification Status</label>
+                  <select
+                    value={verificationStatus}
+                    onChange={(e) => setVerificationStatus(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Needs Review">Needs Review</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Source Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 resize-none"
+                  placeholder="Provide details about crawler endpoints, data publication schedule, and limitations..."
+                />
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Website URL *</label>
                 <input
@@ -625,6 +712,68 @@ const Sources: React.FC = () => {
                     {SOURCE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Organization / Department</label>
+                  <input
+                    type="text"
+                    value={organization}
+                    onChange={(e) => setOrganization(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Ministry of Law & Justice"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Legal Information Type</label>
+                  <input
+                    type="text"
+                    value={legalInformationType}
+                    onChange={(e) => setLegalInformationType(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Acts, Statutes, Rules"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reliability Level</label>
+                  <select
+                    value={reliabilityLevel}
+                    onChange={(e) => setReliabilityLevel(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Authoritative">Authoritative</option>
+                    <option value="Recognized">Recognized</option>
+                    <option value="Secondary">Secondary</option>
+                    <option value="Needs Review">Needs Review</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verification Status</label>
+                  <select
+                    value={verificationStatus}
+                    onChange={(e) => setVerificationStatus(e.target.value)}
+                    className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Needs Review">Needs Review</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Source Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="mt-1 block w-full px-3.5 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 resize-none"
+                  placeholder="Provide details about crawler endpoints, data publication schedule, and limitations..."
+                />
               </div>
 
               <div>

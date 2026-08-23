@@ -10,7 +10,10 @@ import {
   Scale,
   FileDown,
   LogOut,
-  Gavel
+  Gavel,
+  AlertCircle,
+  History,
+  Download
 } from 'lucide-react';
 import { authService } from '../services/api';
 
@@ -42,17 +45,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Duplicate Detection', path: '/duplicates', icon: CopyMinus },
     { name: 'Court Metadata', path: '/court-metadata', icon: Scale },
     { name: 'Reports Compiler', path: '/reports', icon: FileDown },
+    { name: 'Questionable Files', path: '/questionable', icon: AlertCircle },
+    { name: 'Audit Logs', path: '/audit-logs', icon: History },
+    { name: 'Data Exports', path: '/exports', icon: Download },
   ];
 
   const navItems = allNavItems.filter((item) => {
     if (activeRole === 'researcher') {
-      return ['/', '/sources', '/documents', '/metadata', '/court-metadata'].includes(item.path);
+      return ['/', '/sources', '/documents', '/metadata', '/court-metadata', '/questionable'].includes(item.path);
     }
     if (activeRole === 'reviewer') {
-      return ['/', '/documents', '/quality', '/court-metadata'].includes(item.path);
+      return ['/', '/documents', '/quality', '/court-metadata', '/questionable'].includes(item.path);
     }
     if (activeRole === 'admin') {
-      return ['/', '/sources', '/duplicates', '/reports'].includes(item.path);
+      return ['/', '/sources', '/duplicates', '/reports', '/audit-logs', '/exports'].includes(item.path);
     }
     return true;
   });

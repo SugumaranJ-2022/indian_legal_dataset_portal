@@ -193,6 +193,10 @@ export const reportService = {
     link.click();
     link.parentNode?.removeChild(link);
   },
+  getTelemetry: async (): Promise<any> => {
+    const response = await api.get('/reports/telemetry');
+    return response.data;
+  },
 };
 
 export const annotationService = {
@@ -207,6 +211,32 @@ export const annotationService = {
   delete: async (documentId: number, annotationId: number): Promise<void> => {
     await api.delete(`/documents/${documentId}/annotations/${annotationId}`);
   },
+};
+
+export const auditService = {
+  getAll: async (skip = 0, limit = 100): Promise<any[]> => {
+    const response = await api.get(`/audit-logs?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+};
+
+export const exportService = {
+  download: async (type: string, format: string) => {
+    const response = await api.get(`/exports/${type}/${format}`, { responseType: 'blob' });
+    const contentTypes: Record<string, string> = {
+      csv: 'text/csv',
+      excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      json: 'application/json'
+    };
+    const extension = format === 'excel' ? 'xlsx' : format;
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: contentTypes[format] }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${type}_export.${extension}`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+  }
 };
 
 export default api;

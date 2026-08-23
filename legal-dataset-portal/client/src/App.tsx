@@ -17,6 +17,9 @@ import QualityVerification from './pages/QualityVerification';
 import DuplicateDetection from './pages/DuplicateDetection';
 import CourtMetadata from './pages/CourtMetadata';
 import Reports from './pages/Reports';
+import QuestionableReviews from './pages/QuestionableReviews';
+import AuditLogs from './pages/AuditLogs';
+import ExportsManager from './pages/ExportsManager';
 
 const queryClient = new QueryClient();
 
@@ -87,6 +90,9 @@ const App: React.FC = () => {
             <Route path="/duplicates" element={<RoleGuard allowedRoles={['admin']}><DuplicateDetection /></RoleGuard>} />
             <Route path="/court-metadata" element={<RoleGuard allowedRoles={['researcher', 'reviewer']}><CourtMetadata /></RoleGuard>} />
             <Route path="/reports" element={<RoleGuard allowedRoles={['admin']}><Reports /></RoleGuard>} />
+            <Route path="/questionable" element={<RoleGuard allowedRoles={['researcher', 'reviewer']}><QuestionableReviews /></RoleGuard>} />
+            <Route path="/audit-logs" element={<RoleGuard allowedRoles={['admin']}><AuditLogs /></RoleGuard>} />
+            <Route path="/exports" element={<RoleGuard allowedRoles={['admin']}><ExportsManager /></RoleGuard>} />
           </Route>
 
           {/* Catch-all Fallback */}

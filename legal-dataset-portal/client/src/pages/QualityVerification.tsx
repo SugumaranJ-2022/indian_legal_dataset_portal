@@ -31,11 +31,20 @@ interface ChecklistItem {
 
 const CHECKLIST_ITEMS: ChecklistItem[] = [
   { key: 'official_source', label: 'Official Source Mapped', description: 'File sourced from official government gazette or registry node.' },
-  { key: 'readable', label: 'Readable PDF File', description: 'PDF text layer is extractable and passes optical character checks.' },
+  { key: 'correct_title', label: 'Correct Title Verified', description: 'Title is correct and doesn\'t contain typos or wrong acts/sections.' },
+  { key: 'correct_authority', label: 'Correct Authority Verified', description: 'The publishing Ministry, Department, or Court matches official records.' },
+  { key: 'correct_year', label: 'Correct Year Verified', description: 'The publication or enactment year matches the document contents.' },
+  { key: 'correct_language', label: 'Correct Language Verified', description: 'Document language is marked correctly.' },
   { key: 'complete_content', label: 'Complete Content Pack', description: 'Verify no schedules, tables, pages, or sections are missing.' },
-  { key: 'metadata_correct', label: 'Correct Metadata Verified', description: 'Entity title, citation, year and authority parameters correct.' },
-  { key: 'duplicate_checked', label: 'Duplicate File Audited', description: 'Deduplication warnings resolved and cross-referencing done.' },
-  { key: 'version_verified', label: 'Version Control Active', description: 'Version number, amendments dates and draft releases synced.' },
+  { key: 'no_missing_pages', label: 'No Missing Pages', description: 'All pages are present and readable from start to finish.' },
+  { key: 'readable', label: 'Readable PDF File', description: 'PDF text layer is extractable and passes layout checks.' },
+  { key: 'pdf_opens_correctly', label: 'PDF Opens Correctly', description: 'File binary opens without rendering errors or missing parts.' },
+  { key: 'no_obvious_corruption', label: 'No Obvious Corruption', description: 'No binary corruption, broken fonts, or unreadable artifacts.' },
+  { key: 'not_duplicate', label: 'Not Duplicate', description: 'Verified that this document is not a duplicate of another existing record.' },
+  { key: 'metadata_complete', label: 'Metadata Complete', description: 'All mandatory citation fields are fully populated.' },
+  { key: 'exact_source_url_recorded', label: 'Exact Source URL Recorded', description: 'The exact URL where the document was originally published is saved.' },
+  { key: 'duplicate_checked', label: 'Deduplication Checked', description: 'Deduplication warnings verified.' },
+  { key: 'version_verified', label: 'Version Control Active', description: 'Version number and amendment dates are verified.' },
 ];
 
 const QualityVerification: React.FC = () => {
@@ -133,9 +142,18 @@ const QualityVerification: React.FC = () => {
       
       const updatedQc = await qualityService.update(selectedDoc.id, {
         official_source: qc.official_source,
-        readable: qc.readable,
+        correct_title: qc.correct_title,
+        correct_authority: qc.correct_authority,
+        correct_year: qc.correct_year,
+        correct_language: qc.correct_language,
         complete_content: qc.complete_content,
-        metadata_correct: qc.metadata_correct,
+        no_missing_pages: qc.no_missing_pages,
+        readable: qc.readable,
+        pdf_opens_correctly: qc.pdf_opens_correctly,
+        no_obvious_corruption: qc.no_obvious_corruption,
+        not_duplicate: qc.not_duplicate,
+        metadata_complete: qc.metadata_complete,
+        exact_source_url_recorded: qc.exact_source_url_recorded,
         duplicate_checked: qc.duplicate_checked,
         version_verified: qc.version_verified,
         verification_status: nextStatus,
@@ -156,9 +174,10 @@ const QualityVerification: React.FC = () => {
       setSelectedDoc(prev => prev ? { ...prev, status: nextStatus } : null);
       
       alert('Verification checklist successfully saved.');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save checklist audits.');
+      const detail = err.response?.data?.detail || 'Failed to save checklist audits.';
+      alert(detail);
     } finally {
       setSaveLoading(false);
     }
