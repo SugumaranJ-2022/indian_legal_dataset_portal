@@ -56,13 +56,25 @@ def seed_database(db: Session):
 
     # Ensure uploads folder exists and copy sample files
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    desktop_it_act = "c:/Users/Welcome/Desktop/Ai_Task_1/sample_it_act_2000.pdf"
-    desktop_judgment = "c:/Users/Welcome/Desktop/Ai_Task_1/sample_court_judgment.pdf"
-    
-    if os.path.exists(desktop_it_act):
-        shutil.copy(desktop_it_act, os.path.join(settings.UPLOAD_DIR, "sample_it_act_2000.pdf"))
-    if os.path.exists(desktop_judgment):
-        shutil.copy(desktop_judgment, os.path.join(settings.UPLOAD_DIR, "sample_court_judgment.pdf"))
+    sample_files = ["sample_it_act_2000.pdf", "sample_court_judgment.pdf"]
+    for filename in sample_files:
+        src_path = None
+        locs = [
+            os.path.join(os.path.dirname(settings.BASE_DIR), filename),
+            os.path.join(settings.BASE_DIR, filename),
+            os.path.join(os.getcwd(), filename),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", filename),
+        ]
+        for loc in locs:
+            if os.path.exists(loc):
+                src_path = loc
+                break
+        
+        if src_path:
+            shutil.copy(src_path, os.path.join(settings.UPLOAD_DIR, filename))
+            print(f"Seeded document: {filename} from {src_path}")
+        else:
+            print(f"Warning: Seed source file {filename} not found.")
 
     # Check if we already have sources seeded
     if db.query(Source).count() == 0:
@@ -303,6 +315,11 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Indian Legal Dataset Research Portal API"}
+# Serve static frontend build if it exists
+client_dist = os.path.join(settings.BASE_DIR, "client", "dist")
+if os.path.exists(client_dist):
+    app.mount("/", StaticFiles(directory=client_dist, html=True), name="frontend")
+else:
+    @app.get("/")
+    def read_root():
+        return {"message": "Welcome to the Indian Legal Dataset Research Portal API"}

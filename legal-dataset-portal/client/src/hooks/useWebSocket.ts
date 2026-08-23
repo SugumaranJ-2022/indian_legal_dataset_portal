@@ -13,7 +13,13 @@ export const useWebSocket = (enabled: boolean = true, onMessageReceived?: (event
 
     const connect = () => {
       if (isClosing) return;
-      ws = new WebSocket('ws://localhost:8000/ws');
+
+      const defaultWsUrl = window.location.hostname === 'localhost' && window.location.port === '5173'
+        ? 'ws://localhost:8000/ws'
+        : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+
+      const WS_URL = import.meta.env.VITE_WS_URL || defaultWsUrl;
+      ws = new WebSocket(WS_URL);
 
       ws.onopen = () => {
         if (!isClosing) {

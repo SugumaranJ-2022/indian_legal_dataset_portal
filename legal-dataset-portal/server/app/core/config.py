@@ -9,17 +9,20 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
 
+    # Directories
+    BASE_DIR: str = os.getenv(
+        "BASE_DIR", 
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    ).replace("\\", "/")
+    UPLOAD_DIR: str = os.path.join(BASE_DIR, "uploads").replace("\\", "/")
+    REPORTS_DIR: str = os.path.join(BASE_DIR, "reports").replace("\\", "/")
+    DATABASE_DIR: str = os.path.join(BASE_DIR, "database").replace("\\", "/")
+
     # Database
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "sqlite:///c:/Users/Welcome/Desktop/Ai_Task_1/legal-dataset-portal/database/legal_portal.db"
-    )
-
-    # Directories
-    BASE_DIR: str = "c:/Users/Welcome/Desktop/Ai_Task_1/legal-dataset-portal"
-    UPLOAD_DIR: str = os.path.join(BASE_DIR, "uploads")
-    REPORTS_DIR: str = os.path.join(BASE_DIR, "reports")
-    DATABASE_DIR: str = os.path.join(BASE_DIR, "database")
+        f"sqlite:///{os.path.join(DATABASE_DIR, 'legal_portal.db')}"
+    ).replace("\\", "/")
 
     class Config:
         case_sensitive = True
