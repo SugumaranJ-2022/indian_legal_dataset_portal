@@ -126,16 +126,20 @@ def generate_mock_ai_summary(document: Document, text: str) -> str:
     elif document.category == "Acts / Statutes":
         decision = f"Statute enacted by {document.authority or 'Parliament'}."
 
+    layout_msg = "An audit has confirmed the text layout is readable and officially published." if len(text) > 100 else "The layout parser detected limited text content, requiring manual optical character review (OCR)."
+    citations_formatted = "\n".join([f"- *{cit}*" for cit in set(citations)])
+
     summary = f"""### AI-Generated Legal Ingestion Summary
 **Document Code**: `{document.document_code}`
 **Audit Date**: `{datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")} UTC`
 
 #### 📝 Executive Summary
 This document is classified under **{document.category}**, published by **{document.authority or 'Official Source'}** in the year **{document.year}**. 
-{"An audit has confirmed the text layout is readable and officially published." if len(text) > 100 else "The layout parser detected limited text content, requiring manual optical character review (OCR)."}
+{layout_msg}
 
 #### 📑 Legal Citations & Provisions Referenced
-{"".join([f"- *{cit}*\\n" for cit in set(citations)])}
+{citations_formatted}
+
 #### ⚖️ Final Decision / Status
 **{decision}**
 """
