@@ -599,6 +599,49 @@ const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 4. Research Landscape & Compliance Overview Integration */}
+      {stats.research_stats && (
+        <div className="mt-8 bg-white rounded-2xl border border-slate-200/80 shadow-md p-6 animate-fade-in select-none">
+          <div className="border-b border-slate-100 pb-3 mb-5 flex justify-between items-center">
+            <div>
+              <h4 className="text-sm font-bold text-slate-800 tracking-tight uppercase">Indian Legal Dataset Research Landscape</h4>
+              <p className="text-[10px] text-slate-400 font-semibold tracking-wide mt-0.5">COMPLIANCE STATISTICS FOR EXTERNAL BENCHMARK DATASETS</p>
+            </div>
+            
+            <a 
+              href="/datasets"
+              className="text-xs font-bold text-blue-600 hover:text-blue-500 hover:underline flex items-center gap-1 transition"
+            >
+              <span>Go to Discovery Hub</span>
+              <span>&rarr;</span>
+            </a>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="p-4 bg-slate-50 border border-slate-200/50 rounded-xl text-center">
+              <span className="block text-xl font-extrabold text-slate-900">{stats.research_stats.datasets_discovered}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Discovered</span>
+            </div>
+            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-center">
+              <span className="block text-xl font-extrabold text-emerald-700">{stats.research_stats.datasets_shortlisted}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Shortlisted</span>
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-150 rounded-xl text-center">
+              <span className="block text-xl font-extrabold text-blue-700">{stats.research_stats.platforms_investigated}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Platforms</span>
+            </div>
+            <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl text-center">
+              <span className="block text-xl font-extrabold text-teal-700">{stats.research_stats.provenance_verified}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Provenance Verified</span>
+            </div>
+            <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-center col-span-2 md:col-span-1">
+              <span className="block text-xl font-extrabold text-rose-700">{stats.research_stats.high_priority_gaps}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-1">Critical Gaps</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

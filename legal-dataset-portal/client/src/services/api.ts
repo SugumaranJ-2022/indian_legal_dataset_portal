@@ -1,5 +1,17 @@
 import axios from 'axios';
-import type { Source, Document, QualityCheck, Duplicate, CourtMetadata, DashboardStats } from '../types';
+import type { 
+  Source, 
+  Document, 
+  QualityCheck, 
+  Duplicate, 
+  CourtMetadata, 
+  DashboardStats,
+  Dataset,
+  DatasetEvidence,
+  GapAnalysis,
+  ResearchSearchLog,
+  ResearchMethodology
+} from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || (
   window.location.hostname === 'localhost' && window.location.port === '5173'
@@ -171,24 +183,26 @@ export const dashboardService = {
 };
 
 export const reportService = {
-  downloadPdf: async () => {
-    const response = await api.get('/reports/pdf', { responseType: 'blob' });
+  downloadPdf: async (reportType: string = 'audit') => {
+    const response = await api.get(`/reports/pdf?report_type=${reportType}`, { responseType: 'blob' });
     const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'Legal_Dataset_Audit_Report.pdf');
+    const filename = reportType === 'landscape' ? 'Indian_Legal_Dataset_Landscape_Report.pdf' : 'Legal_Dataset_Audit_Report.pdf';
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.parentNode?.removeChild(link);
   },
-  downloadExcel: async () => {
-    const response = await api.get('/reports/excel', { responseType: 'blob' });
+  downloadExcel: async (reportType: string = 'audit') => {
+    const response = await api.get(`/reports/excel?report_type=${reportType}`, { responseType: 'blob' });
     const url = window.URL.createObjectURL(
       new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     );
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'Legal_Dataset_Audit_Report.xlsx');
+    const filename = reportType === 'landscape' ? 'Indian_Legal_Dataset_Landscape_Report.xlsx' : 'Legal_Dataset_Audit_Report.xlsx';
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.parentNode?.removeChild(link);
@@ -197,6 +211,88 @@ export const reportService = {
     const response = await api.get('/reports/telemetry');
     return response.data;
   },
+};
+
+export const datasetService = {
+  getAll: async (search?: string, platform?: string, category?: string, shortlisted?: boolean): Promise<Dataset[]> => {
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (platform) params.append('platform', platform);
+    if (category) params.append('category', category);
+    if (shortlisted !== undefined) params.append('shortlisted', String(shortlisted));
+    const response = await api.get(`/datasets?${params.toString()}`);
+    return response.data;
+  },
+  getById: async (id: number): Promise<Dataset> => {
+    const response = await api.get(`/datasets/${id}`);
+    return response.data;
+  },
+  create: async (data: Partial<Dataset>): Promise<Dataset> => {
+    const response = await api.post('/datasets', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<Dataset>): Promise<Dataset> => {
+    const response = await api.put(`/datasets/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: number): Promise<void> => {
+    await api.delete(`/datasets/${id}`);
+  },
+  
+  // Evidence
+  getEvidence: async (datasetId: number): Promise<DatasetEvidence[]> => {
+    const response = await api.get(`/datasets/${datasetId}/evidence`);
+    return response.data;
+  },
+  createEvidence: async (datasetId: number, data: Partial<DatasetEvidence>): Promise<DatasetEvidence> => {
+    const response = await api.post(`/datasets/${datasetId}/evidence`, data);
+    return response.data;
+  },
+  updateEvidence: async (datasetId: number, evidenceId: number, data: Partial<DatasetEvidence>): Promise<DatasetEvidence> => {
+    const response = await api.put(`/datasets/${datasetId}/evidence/${evidenceId}`, data);
+    return response.data;
+  },
+  deleteEvidence: async (datasetId: number, evidenceId: number): Promise<void> => {
+    await api.delete(`/datasets/${datasetId}/evidence/${evidenceId}`);
+  }
+};
+
+export const gapService = {
+  getAll: async (): Promise<GapAnalysis[]> => {
+    const response = await api.get('/gaps');
+    return response.data;
+  },
+  getById: async (id: number): Promise<GapAnalysis> => {
+    const response = await api.get(`/gaps/${id}`);
+    return response.data;
+  },
+  create: async (data: Partial<GapAnalysis>): Promise<GapAnalysis> => {
+    const response = await api.post('/gaps', data);
+    return response.data;
+  },
+  update: async (id: number, data: Partial<GapAnalysis>): Promise<GapAnalysis> => {
+    const response = await api.put(`/gaps/${id}`, data);
+    return response.data;
+  }
+};
+
+export const researchService = {
+  getSearchLogs: async (): Promise<ResearchSearchLog[]> => {
+    const response = await api.get('/research/search-log');
+    return response.data;
+  },
+  createSearchLog: async (data: Partial<ResearchSearchLog>): Promise<ResearchSearchLog> => {
+    const response = await api.post('/research/search-log', data);
+    return response.data;
+  },
+  getMethodology: async (): Promise<ResearchMethodology> => {
+    const response = await api.get('/research/methodology');
+    return response.data;
+  },
+  updateMethodology: async (data: Partial<ResearchMethodology>): Promise<ResearchMethodology> => {
+    const response = await api.put('/research/methodology', data);
+    return response.data;
+  }
 };
 
 export const annotationService = {
@@ -232,7 +328,8 @@ export const exportService = {
     const url = window.URL.createObjectURL(new Blob([response.data], { type: contentTypes[format] }));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `${type}_export.${extension}`);
+    const filename = `${type}_export.${extension}`;
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.parentNode?.removeChild(link);

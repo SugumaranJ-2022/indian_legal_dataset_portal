@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -81,13 +81,14 @@ def get_final_report_telemetry(
 
 @router.get("/pdf")
 def export_pdf_report(
+    report_type: str = Query("audit"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate and export a professional PDF data audit report.
+    Generate and export a professional PDF data audit report or landscape report.
     """
-    file_name = "Legal_Dataset_Audit_Report.pdf"
+    file_name = "Indian_Legal_Dataset_Landscape_Report.pdf" if report_type == "landscape" else "Legal_Dataset_Audit_Report.pdf"
     file_path = os.path.join(settings.REPORTS_DIR, file_name)
     
     # Make sure parent dir exists
@@ -96,7 +97,7 @@ def export_pdf_report(
     try:
         # Import service dynamically to avoid cyclic imports
         from app.services.report_service import generate_pdf_report
-        generate_pdf_report(db, file_path)
+        generate_pdf_report(db, file_path, report_type)
         if not os.path.exists(file_path):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -115,13 +116,14 @@ def export_pdf_report(
 
 @router.get("/excel")
 def export_excel_report(
+    report_type: str = Query("audit"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Generate and export a multi-sheet Excel data audit report.
+    Generate and export a multi-sheet Excel data audit report or landscape report.
     """
-    file_name = "Legal_Dataset_Audit_Report.xlsx"
+    file_name = "Indian_Legal_Dataset_Landscape_Report.xlsx" if report_type == "landscape" else "Legal_Dataset_Audit_Report.xlsx"
     file_path = os.path.join(settings.REPORTS_DIR, file_name)
     
     # Make sure parent dir exists
@@ -130,7 +132,7 @@ def export_excel_report(
     try:
         # Import service dynamically
         from app.services.report_service import generate_excel_report
-        generate_excel_report(db, file_path)
+        generate_excel_report(db, file_path, report_type)
         if not os.path.exists(file_path):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

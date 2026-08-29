@@ -21,6 +21,7 @@ const Reports: React.FC = () => {
   const [excelLoading, setExcelLoading] = useState(false);
   const [telemetry, setTelemetry] = useState<ReportTelemetry | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedReportType, setSelectedReportType] = useState<'audit' | 'landscape'>('audit');
 
   const fetchTelemetry = async () => {
     setLoading(true);
@@ -41,7 +42,7 @@ const Reports: React.FC = () => {
   const handlePdfDownload = async () => {
     setPdfLoading(true);
     try {
-      await reportService.downloadPdf();
+      await reportService.downloadPdf(selectedReportType);
     } catch (err) {
       console.error(err);
       alert('Could not download PDF report.');
@@ -53,7 +54,7 @@ const Reports: React.FC = () => {
   const handleExcelDownload = async () => {
     setExcelLoading(true);
     try {
-      await reportService.downloadExcel();
+      await reportService.downloadExcel(selectedReportType);
     } catch (err) {
       console.error(err);
       alert('Could not export Excel database.');
@@ -72,6 +73,19 @@ const Reports: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Compiler controls (4 columns) */}
         <div className="lg:col-span-4 space-y-6 select-none">
+          {/* Report Type Selector Card */}
+          <div className="glass-panel p-5 rounded-2xl shadow-md border border-slate-200/80 bg-white space-y-2">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Report Type</label>
+            <select
+              value={selectedReportType}
+              onChange={(e) => setSelectedReportType(e.target.value as 'audit' | 'landscape')}
+              className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 font-bold text-slate-900 cursor-pointer"
+            >
+              <option value="audit">Ingestion Data Audit Report</option>
+              <option value="landscape">Indian Legal Dataset Landscape Report</option>
+            </select>
+          </div>
+
           {/* PDF Card */}
           <div className="glass-panel p-6 rounded-2xl shadow-md border border-slate-200/80 flex flex-col gap-4 bg-white">
             <div className="flex gap-4 items-start">
@@ -79,12 +93,18 @@ const Reports: React.FC = () => {
                 <FileText size={24} className="stroke-[2]" />
               </div>
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight leading-tight uppercase">PDF Ingestion Audit</h3>
-                <p className="text-[9px] text-slate-400 font-bold tracking-wide mt-0.5">A4 PORTRAIT FORMAT</p>
+                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight leading-tight uppercase">
+                  {selectedReportType === 'landscape' ? 'Research Landscape PDF' : 'PDF Ingestion Audit'}
+                </h3>
+                <p className="text-[9px] text-slate-400 font-bold tracking-wide mt-0.5">
+                  {selectedReportType === 'landscape' ? 'A4 RESEARCH FORMAT' : 'A4 PORTRAIT FORMAT'}
+                </p>
               </div>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Generates a printable PDF publication mapping mapped sources, collection lists, verification checklists, duplicates detection, and findings.
+              {selectedReportType === 'landscape' 
+                ? 'Generates a highly structured research publication mapping external legal datasets, comparison matrices, licensing warning grids, and recommendations.' 
+                : 'Generates a printable PDF publication mapping mapped sources, collection lists, verification checklists, duplicates detection, and findings.'}
             </p>
             <button
               onClick={handlePdfDownload}
@@ -103,12 +123,18 @@ const Reports: React.FC = () => {
                 <FileSpreadsheet size={24} className="stroke-[2]" />
               </div>
               <div>
-                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight leading-tight uppercase">Excel Spreadsheet</h3>
-                <p className="text-[9px] text-slate-400 font-bold tracking-wide mt-0.5">MULTI-SHEET WORKBOOK</p>
+                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight leading-tight uppercase">
+                  {selectedReportType === 'landscape' ? 'Research Landscape Excel' : 'Excel Spreadsheet'}
+                </h3>
+                <p className="text-[9px] text-slate-400 font-bold tracking-wide mt-0.5">
+                  {selectedReportType === 'landscape' ? '15-SHEET WORKBOOK' : 'MULTI-SHEET WORKBOOK'}
+                </p>
               </div>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed font-medium">
-              Downloads a raw data workbook containing sheets for Sources, Documents, Metadata, Quality verification checks, and Duplicates resolution lists.
+              {selectedReportType === 'landscape' 
+                ? 'Downloads a workbook with 15 sheets detailing external dataset inventories, comparison stats, license clearance audits, gap logs, evidence lists, and audit logs.' 
+                : 'Downloads a raw data workbook containing sheets for Sources, Documents, Metadata, Quality verification checks, and Duplicates resolution lists.'}
             </p>
             <button
               onClick={handleExcelDownload}

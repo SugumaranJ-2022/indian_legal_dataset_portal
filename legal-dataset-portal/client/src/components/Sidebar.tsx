@@ -13,7 +13,11 @@ import {
   Gavel,
   AlertCircle,
   History,
-  Download
+  Download,
+  Compass,
+  GitCompare,
+  AlertOctagon,
+  FileCheck
 } from 'lucide-react';
 import { authService } from '../services/api';
 
@@ -48,17 +52,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     { name: 'Questionable Files', path: '/questionable', icon: AlertCircle },
     { name: 'Audit Logs', path: '/audit-logs', icon: History },
     { name: 'Data Exports', path: '/exports', icon: Download },
+    { name: 'Dataset Discovery', path: '/datasets', icon: Compass },
+    { name: 'Dataset Comparison', path: '/comparison', icon: GitCompare },
+    { name: 'Coverage Gap Analysis', path: '/gaps', icon: AlertOctagon },
+    { name: 'Provenance & License', path: '/provenance', icon: FileCheck },
   ];
 
   const navItems = allNavItems.filter((item) => {
     if (activeRole === 'researcher') {
-      return ['/', '/sources', '/documents', '/metadata', '/court-metadata', '/questionable'].includes(item.path);
+      return ['/', '/sources', '/documents', '/metadata', '/court-metadata', '/questionable', '/datasets', '/comparison', '/gaps', '/provenance'].includes(item.path);
     }
     if (activeRole === 'reviewer') {
-      return ['/', '/documents', '/quality', '/court-metadata', '/questionable'].includes(item.path);
+      return ['/', '/documents', '/quality', '/court-metadata', '/questionable', '/datasets', '/comparison', '/gaps', '/provenance'].includes(item.path);
     }
     if (activeRole === 'admin') {
-      return ['/', '/sources', '/duplicates', '/reports', '/audit-logs', '/exports'].includes(item.path);
+      return ['/', '/sources', '/duplicates', '/reports', '/audit-logs', '/exports', '/datasets', '/comparison', '/gaps', '/provenance'].includes(item.path);
     }
     return true;
   });

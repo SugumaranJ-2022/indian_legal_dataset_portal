@@ -20,6 +20,11 @@ import Reports from './pages/Reports';
 import QuestionableReviews from './pages/QuestionableReviews';
 import AuditLogs from './pages/AuditLogs';
 import ExportsManager from './pages/ExportsManager';
+import DatasetDiscovery from './pages/DatasetDiscovery';
+import DatasetDetail from './pages/DatasetDetail';
+import DatasetComparison from './pages/DatasetComparison';
+import GapAnalysis from './pages/GapAnalysis';
+import ProvenanceLicense from './pages/ProvenanceLicense';
 
 const queryClient = new QueryClient();
 
@@ -93,6 +98,11 @@ const App: React.FC = () => {
             <Route path="/questionable" element={<RoleGuard allowedRoles={['researcher', 'reviewer']}><QuestionableReviews /></RoleGuard>} />
             <Route path="/audit-logs" element={<RoleGuard allowedRoles={['admin']}><AuditLogs /></RoleGuard>} />
             <Route path="/exports" element={<RoleGuard allowedRoles={['admin']}><ExportsManager /></RoleGuard>} />
+            <Route path="/datasets" element={<RoleGuard allowedRoles={['researcher', 'reviewer', 'admin']}><DatasetDiscovery /></RoleGuard>} />
+            <Route path="/datasets/:id" element={<RoleGuard allowedRoles={['researcher', 'reviewer', 'admin']}><DatasetDetail /></RoleGuard>} />
+            <Route path="/comparison" element={<RoleGuard allowedRoles={['researcher', 'reviewer', 'admin']}><DatasetComparison /></RoleGuard>} />
+            <Route path="/gaps" element={<RoleGuard allowedRoles={['researcher', 'reviewer', 'admin']}><GapAnalysis /></RoleGuard>} />
+            <Route path="/provenance" element={<RoleGuard allowedRoles={['researcher', 'reviewer', 'admin']}><ProvenanceLicense /></RoleGuard>} />
           </Route>
 
           {/* Catch-all Fallback */}

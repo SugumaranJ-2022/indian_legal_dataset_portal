@@ -40,6 +40,9 @@ def get_current_user(
     # Check if client requested a role override (useful for testing RBAC in development)
     override_role = request.headers.get("x-override-role")
     if override_role and override_role in ["researcher", "reviewer", "admin"]:
+        from sqlalchemy.orm import make_transient
+        db.expunge(user)
+        make_transient(user)
         user.role = override_role
         
     return user
