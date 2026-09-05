@@ -59,16 +59,35 @@ def get_dashboard_statistics(
 
     upload_trends = [{"month": k, "count": v} for k, v in months_map.items()]
 
-    # Calculate Research Stats Dynamically
+    # Calculate Research Stats Dynamically for Requirement 33
     datasets = db.query(Dataset).all()
     datasets_discovered = len(datasets)
+    total_datasets_investigated = len(datasets)
     datasets_shortlisted = sum(1 for d in datasets if d.shortlisted)
     platforms_investigated = len(set(d.platform for d in datasets if d.platform))
-    provenance_verified = sum(1 for d in datasets if d.provenance_status == "Verified")
-    license_verified = sum(1 for d in datasets if d.license_status == "Clear")
-    license_unclear = sum(1 for d in datasets if d.license_status in ["License Unclear", "No License Found"])
-    requires_review = sum(1 for d in datasets if d.status == "Under Review")
-    high_priority_gaps = db.query(GapAnalysis).filter(GapAnalysis.priority.in_(["Critical", "High"])).count()
+    verified_datasets = sum(1 for d in datasets if d.provenance_status in ["Verified", "VERIFIED"])
+    partially_verified_datasets = sum(1 for d in datasets if d.provenance_status in ["Partially Verified", "PARTIALLY_VERIFIED"])
+    unverified_datasets = sum(1 for d in datasets if d.provenance_status in ["Unclear", "UNVERIFIED", "Not Verified"])
+    
+    provenance_verified = verified_datasets
+    license_verified = sum(1 for d in datasets if d.license_status in ["Clear", "LICENSE_VERIFIED"])
+    license_unclear = sum(1 for d in datasets if d.license_status in ["License Unclear", "LICENSE_UNCLEAR", "No License Found"])
+    requires_review = sum(1 for d in datasets if d.status == "Under Review" or d.reuse_recommendation == "VERIFY FIRST")
+    
+    total_reported_records = sum(d.record_count or 0 for d in datasets)
+    court_judgment_datasets_count = sum(1 for d in datasets if "Judgment" in (d.category or "") or "Court" in (d.category or ""))
+    acts_rules_datasets_count = sum(1 for d in datasets if "Acts" in (d.category or "") or "Rules" in (d.category or "") or "Integrated" in (d.category or ""))
+    nlp_datasets_count = sum(1 for d in datasets if "NLP" in (d.category or "") or "QA" in (d.category or "") or "Summarization" in (d.category or ""))
+    multilingual_datasets_count = sum(1 for d in datasets if "Multilingual" in (d.category or "") or (d.languages and ("Hindi" in d.languages or "Regional" in d.languages or "Indic" in d.languages)))
+    
+    high_priority_gaps = db.query(GapAnalysis).filter(GapAnalysis.priority.in_(["Critical", "High", "Very High"])).count()
+    recommended_new_collection_areas = [
+        "District & Subordinate Court Certified Judgment PDFs",
+        "Subordinate Rules, Gazette Notifications & Circulars",
+        "Supreme Court Regional Language Translation Records",
+        "Standardized Act -> Section -> Judgment Citation Graph",
+        "CNR Identification & Document Hash Verification Chain"
+    ]
 
     # Group by aggregations for research charts
     by_platform = {}
@@ -110,20 +129,33 @@ def get_dashboard_statistics(
 
     research_stats = {
         "datasets_discovered": datasets_discovered,
+        "total_datasets_investigated": total_datasets_investigated,
         "datasets_shortlisted": datasets_shortlisted,
         "platforms_investigated": platforms_investigated,
+        "verified_datasets": verified_datasets,
+        "partially_verified_datasets": partially_verified_datasets,
+        "unverified_datasets": unverified_datasets,
         "provenance_verified": provenance_verified,
         "license_verified": license_verified,
         "license_unclear": license_unclear,
         "requires_review": requires_review,
+        "total_reported_records": total_reported_records,
+        "total_reported_records_str": "135M+ reported records across investigated datasets",
+        "records_qualification_note": "Reported records across investigated datasets (datasets may overlap; not unique legal documents)",
+        "court_judgment_datasets_count": court_judgment_datasets_count,
+        "acts_rules_datasets_count": acts_rules_datasets_count,
+        "nlp_datasets_count": nlp_datasets_count,
+        "multilingual_datasets_count": multilingual_datasets_count,
         "high_priority_gaps": high_priority_gaps,
+        "recommended_new_collection_areas": recommended_new_collection_areas,
         "by_platform": by_platform,
         "by_category": by_category,
         "by_provenance": by_provenance,
         "by_license": by_license,
         "by_freshness": by_freshness,
         "by_availability": by_availability,
-        "gap_priorities": gap_priorities
+        "gap_priorities": gap_priorities,
+        "final_decision_quote": "Existing datasets are sufficient to avoid immediately rebuilding large Supreme Court and High Court judgment archives. Existing sources should first be evaluated for reuse under their applicable licenses and terms. New collection should focus on areas where coverage, provenance, freshness, metadata quality, multilingual support, or document availability remains insufficient."
     }
 
     return DashboardStats(

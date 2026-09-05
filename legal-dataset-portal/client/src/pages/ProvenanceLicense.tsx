@@ -118,36 +118,56 @@ const ProvenanceLicense: React.FC = () => {
       />
 
       {/* Grid: Compliance Telemetry Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 select-none">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 select-none">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <ShieldCheck size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Provenance Audited</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Verified Provenance</div>
             <div className="text-xl font-extrabold text-slate-900">
-              {datasets.filter(d => d.provenance_status === 'Verified').length} / {datasets.length} Datasets
+              {datasets.filter(d => (d.provenance_status || '').toUpperCase() === 'VERIFIED').length} / {datasets.length}
             </div>
+            <span className="text-[10px] text-emerald-600 font-bold">Registry Validated</span>
           </div>
         </div>
+
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+            <ShieldAlert size={22} />
+          </div>
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Partially Verified</div>
+            <div className="text-xl font-extrabold text-slate-900">
+              {datasets.filter(d => (d.provenance_status || '').toUpperCase().includes('PARTIAL')).length} / {datasets.length}
+            </div>
+            <span className="text-[10px] text-amber-600 font-bold">Secondary Sources</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-teal-50 text-teal-600 rounded-xl">
             <BookmarkCheck size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Permissible License (Clear)</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">License Verified</div>
             <div className="text-xl font-extrabold text-slate-900">
-              {datasets.filter(d => d.license_status === 'Clear').length} / {datasets.length} Datasets
+              {datasets.filter(d => (d.license_status || '').toUpperCase() === 'CLEAR' || (d.license_status || '').toUpperCase() === 'LICENSE_VERIFIED').length} / {datasets.length}
             </div>
+            <span className="text-[10px] text-teal-600 font-bold">Open Access / CC / CDLA</span>
           </div>
         </div>
+
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
             <ShieldAlert size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Compliance Risks (Warnings)</div>
-            <div className="text-xl font-extrabold text-rose-700">{unclearedDatasets.length} Flagged</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">License Unclear / Risks</div>
+            <div className="text-xl font-extrabold text-rose-700">
+              {datasets.filter(d => (d.license_status || '').toUpperCase().includes('UNCLEAR') || (d.license_status || '').toUpperCase().includes('NO LICENSE')).length} Flagged
+            </div>
+            <span className="text-[10px] text-rose-600 font-bold">Requires Verification</span>
           </div>
         </div>
       </div>
@@ -227,7 +247,7 @@ const ProvenanceLicense: React.FC = () => {
                       type="text"
                       placeholder="e.g. Restricted commercial license, missing content text"
                       value={exclusionCriteria}
-                      onChange={(e) => setSearchTerms(e.target.value)} // wait, typo check: let's use exclusionCriteria!
+                      onChange={(e) => setExclusionCriteria(e.target.value)}
                       className="w-full p-2 border border-slate-200 rounded-lg text-xs"
                     />
                   </div>

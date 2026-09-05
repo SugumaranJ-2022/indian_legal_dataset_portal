@@ -138,13 +138,25 @@ export interface DashboardStats {
   upload_trends: Array<{ month: string; count: number }>;
   research_stats?: {
     datasets_discovered: number;
+    total_datasets_investigated?: number;
     datasets_shortlisted: number;
     platforms_investigated: number;
+    verified_datasets?: number;
+    partially_verified_datasets?: number;
+    unverified_datasets?: number;
     provenance_verified: number;
     license_verified: number;
     license_unclear: number;
     requires_review: number;
+    total_reported_records?: number;
+    total_reported_records_str?: string;
+    records_qualification_note?: string;
+    court_judgment_datasets_count?: number;
+    acts_rules_datasets_count?: number;
+    nlp_datasets_count?: number;
+    multilingual_datasets_count?: number;
     high_priority_gaps: number;
+    recommended_new_collection_areas?: string[];
     by_platform: Record<string, number>;
     by_category: Record<string, number>;
     by_provenance: Record<string, number>;
@@ -152,6 +164,7 @@ export interface DashboardStats {
     by_freshness: Record<string, number>;
     by_availability: Record<string, number>;
     gap_priorities: Record<string, number>;
+    final_decision_quote?: string;
   };
 }
 
@@ -215,6 +228,7 @@ export interface Dataset {
   legal_domain?: string;
   dataset_type?: string;
   record_count?: number;
+  record_count_note?: string;
   record_count_source?: string;
   time_period_start?: string;
   time_period_end?: string;
@@ -226,6 +240,7 @@ export interface Dataset {
   format?: string;
   file_types?: string;
   data_structure?: string;
+  contents?: string;
   text_available: boolean;
   metadata_available: boolean;
   metadata_fields?: string;
@@ -235,14 +250,18 @@ export interface Dataset {
   structured_data_available: boolean;
   original_source?: string;
   original_source_url?: string;
+  source_url_status?: string;
+  dataset_url_status?: string;
   collection_method?: string;
   collection_description?: string;
   collection_date?: string;
   provenance_status: string;
+  provenance_strength?: string;
   provenance_evidence?: string;
   provenance_notes?: string;
   license_name?: string;
   license_url?: string;
+  license_url_status?: string;
   license_status: string;
   commercial_use: boolean;
   redistribution_allowed: boolean;
@@ -255,10 +274,13 @@ export interface Dataset {
   metadata_quality?: string;
   completeness_assessment?: string;
   data_quality_assessment?: string;
+  quality_notes?: string;
   known_duplicates?: string;
   known_errors?: string;
   limitations?: string;
   reuse_classification: string;
+  reuse_recommendation?: string;
+  reuse_priority?: string;
   reuse_reason?: string;
   research_relevance_score: number;
   recommendation?: string;

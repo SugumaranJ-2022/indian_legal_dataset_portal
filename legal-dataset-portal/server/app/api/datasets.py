@@ -35,66 +35,84 @@ def log_audit(db: Session, email: str, action: str, entity: str, entity_id: int,
 
 def calculate_relevance_score(ds: Dataset) -> int:
     """
-    Provenance: 25%
-    Coverage: 20%
-    Metadata: 15%
-    Document Availability: 15%
-    Freshness: 10%
-    License Clarity: 10%
-    Documentation: 5%
-    Score: 0-100
+    Standardized Transparent Quality Score (0-100):
+    - Provenance: 0–25
+    - License clarity: 0–15
+    - Coverage: 0–15
+    - Metadata quality: 0–15
+    - Document availability: 0–10
+    - Freshness: 0–10
+    - Data quality: 0–10
+    Total: 100
+    Rating Bands: 90-100: Excellent, 75-89: Strong, 60-74: Moderate, <60: Limited
     """
     score = 0
     
-    # 1. Provenance (25 pts)
-    if ds.provenance_status == "Verified":
+    # 1. Provenance: 0–25 pts
+    if ds.provenance_status in ["Verified", "VERIFIED"]:
         score += 25
-    elif ds.provenance_status == "Partially Verified":
+    elif ds.provenance_status in ["Partially Verified", "PARTIALLY_VERIFIED", "Partial"]:
         score += 15
-    elif ds.provenance_status == "Unclear":
+    elif ds.provenance_status in ["Unclear", "UNVERIFIED", "Not Verified"]:
         score += 5
         
-    # 2. Coverage (20 pts)
-    if ds.record_count and ds.record_count > 1000000:
-        score += 20
-    elif ds.record_count and ds.record_count > 50000:
+    # 2. License clarity: 0–15 pts
+    if ds.license_status in ["Clear", "LICENSE_VERIFIED"]:
         score += 15
-    elif ds.record_count and ds.record_count > 1000:
+    elif ds.license_status in ["Reusable With Conditions", "Academic/Research Use", "LICENSE_PARTIAL"]:
         score += 10
+    elif ds.license_status in ["License Unclear", "LICENSE_UNCLEAR", "No License Found"]:
+        score += 2
+        
+    # 3. Coverage: 0–15 pts
+    if ds.record_count and ds.record_count >= 1000000:
+        score += 15
+    elif ds.record_count and ds.record_count >= 50000:
+        score += 12
+    elif ds.record_count and ds.record_count >= 1000:
+        score += 9
     elif ds.record_count:
+        score += 6
+    else:
         score += 5
         
-    # 3. Metadata (15 pts)
-    if ds.metadata_available:
-        score += 10
-    if ds.metadata_fields and len(ds.metadata_fields.split(",")) >= 4:
-        score += 5
-        
-    # 4. Document Availability (15 pts)
-    if ds.original_pdf_available or ds.original_documents_available:
+    # 4. Metadata quality: 0–15 pts
+    if ds.metadata_available and ds.metadata_fields and len(ds.metadata_fields.split(",")) >= 4:
         score += 15
+    elif ds.metadata_available or ds.metadata_quality == "High":
+        score += 11
+    elif ds.metadata_quality == "Medium":
+        score += 7
+    else:
+        score += 4
+        
+    # 5. Document availability: 0–10 pts
+    if ds.original_pdf_available or ds.original_documents_available:
+        score += 10
     elif ds.text_available:
-        score += 10
+        score += 7
+    elif ds.metadata_available:
+        score += 4
+    else:
+        score += 2
         
-    # 5. Freshness (10 pts)
-    if ds.freshness_status == "Fresh":
+    # 6. Freshness: 0–10 pts
+    if ds.freshness_status in ["Fresh", "Very Fresh", "Current"]:
         score += 10
-    elif ds.freshness_status == "Aging":
-        score += 5
-        
-    # 6. License Clarity (10 pts)
-    if ds.license_status == "Clear":
-        score += 10
-    elif ds.license_status in ["Reusable With Conditions", "Academic/Research Use"]:
-        score += 5
-        
-    # 7. Documentation (5 pts)
-    if ds.documentation_quality == "High":
-        score += 5
-    elif ds.documentation_quality == "Medium":
+    elif ds.freshness_status in ["Moderate", "Aging"]:
+        score += 6
+    else:
         score += 3
         
-    return score
+    # 7. Data quality & documentation: 0–10 pts
+    if ds.documentation_quality == "High" or (ds.data_quality_assessment and "Clean" in ds.data_quality_assessment):
+        score += 10
+    elif ds.documentation_quality == "Medium":
+        score += 7
+    else:
+        score += 4
+        
+    return min(score, 100)
 
 @router.get("", response_model=List[DatasetResponse])
 def get_datasets(

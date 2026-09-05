@@ -27,6 +27,12 @@ const DatasetDiscovery: React.FC = () => {
   const [category, setCategory] = useState('');
   const [shortlistedOnly, setShortlistedOnly] = useState<boolean | undefined>(undefined);
   
+  const [provenanceFilter, setProvenanceFilter] = useState('');
+  const [licenseFilter, setLicenseFilter] = useState('');
+  const [freshnessFilter, setFreshnessFilter] = useState('');
+  const [reuseFilter, setReuseFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'score' | 'records' | 'date' | 'rank'>('score');
+  
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showShortlistModal, setShowShortlistModal] = useState<Dataset | null>(null);
@@ -74,6 +80,47 @@ const DatasetDiscovery: React.FC = () => {
     fetchDatasets();
   }, [search, platform, category, shortlistedOnly]);
 
+  // Client-side filtering for newly supported granular filters
+  const filteredDatasets = datasets.filter((ds) => {
+    if (provenanceFilter) {
+      const prov = (ds.provenance_status || '').toUpperCase();
+      if (provenanceFilter === 'VERIFIED' && !prov.includes('VERIFIED')) return false;
+      if (provenanceFilter === 'PARTIALLY_VERIFIED' && !prov.includes('PARTIAL')) return false;
+      if (provenanceFilter === 'UNVERIFIED' && (prov.includes('PARTIAL') || prov === 'VERIFIED')) return false;
+    }
+    if (licenseFilter) {
+      const lic = (ds.license_status || '').toUpperCase();
+      if (licenseFilter === 'VERIFIED' && !lic.includes('CLEAR') && !lic.includes('VERIFIED')) return false;
+      if (licenseFilter === 'PARTIAL' && !lic.includes('PARTIAL')) return false;
+      if (licenseFilter === 'UNCLEAR' && (lic.includes('CLEAR') || lic === 'LICENSE_VERIFIED')) return false;
+    }
+    if (freshnessFilter) {
+      const fresh = (ds.freshness_status || '').toLowerCase();
+      if (freshnessFilter === 'current' && !fresh.includes('current')) return false;
+      if (freshnessFilter === 'historical' && !fresh.includes('historical')) return false;
+      if (freshnessFilter === 'static' && !fresh.includes('static')) return false;
+    }
+    if (reuseFilter) {
+      const reuse = (ds.reuse_recommendation || ds.reuse_classification || '').toUpperCase();
+      if (!reuse.includes(reuseFilter.toUpperCase())) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    if (sortBy === 'score') {
+      return (b.research_relevance_score || 0) - (a.research_relevance_score || 0);
+    }
+    if (sortBy === 'records') {
+      return (b.record_count || 0) - (a.record_count || 0);
+    }
+    if (sortBy === 'date') {
+      return (b.last_updated_date || b.publication_date || '').localeCompare(a.last_updated_date || a.publication_date || '');
+    }
+    if (sortBy === 'rank') {
+      return (a.shortlist_rank || 999) - (b.shortlist_rank || 999);
+    }
+    return 0;
+  });
+
   const handleAddDataset = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
@@ -82,7 +129,6 @@ const DatasetDiscovery: React.FC = () => {
       return;
     }
     
-    // Quick validation check on url
     if (!newDataset.dataset_url.startsWith('http://') && !newDataset.dataset_url.startsWith('https://')) {
       setFormError('URL must be a valid link starting with http:// or https://');
       return;
@@ -91,7 +137,6 @@ const DatasetDiscovery: React.FC = () => {
     try {
       await datasetService.create(newDataset);
       setShowAddModal(false);
-      // Reset form
       setNewDataset({
         dataset_name: '',
         short_name: '',
@@ -121,7 +166,6 @@ const DatasetDiscovery: React.FC = () => {
 
   const handleToggleShortlist = async (dataset: Dataset) => {
     if (dataset.shortlisted) {
-      // Remove from shortlist
       try {
         await datasetService.update(dataset.id, {
           shortlisted: false,
@@ -133,7 +177,6 @@ const DatasetDiscovery: React.FC = () => {
         console.error('Failed to update shortlist status', err);
       }
     } else {
-      // Show reason modal
       setShortlistReason('');
       setShortlistRank(datasets.filter(d => d.shortlisted).length + 1);
       setShowShortlistModal(dataset);
@@ -155,18 +198,31 @@ const DatasetDiscovery: React.FC = () => {
     }
   };
 
-  // Get score color
-  const getScoreBadgeClass = (score: number) => {
-    if (score >= 80) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (score >= 50) return 'bg-amber-50 text-amber-700 border-amber-200';
-    return 'bg-rose-50 text-rose-700 border-rose-200';
+  // 100-Point Rating Band logic
+  const getRatingBand = (score: number) => {
+    if (score >= 90) return { label: 'Excellent', class: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+    if (score >= 75) return { label: 'Strong', class: 'bg-blue-100 text-blue-800 border-blue-300' };
+    if (score >= 60) return { label: 'Moderate', class: 'bg-amber-100 text-amber-800 border-amber-300' };
+    return { label: 'Limited', class: 'bg-rose-100 text-rose-800 border-rose-300' };
+  };
+
+  const resetAllFilters = () => {
+    setSearch('');
+    setPlatform('');
+    setCategory('');
+    setProvenanceFilter('');
+    setLicenseFilter('');
+    setFreshnessFilter('');
+    setReuseFilter('');
+    setShortlistedOnly(undefined);
+    setSortBy('score');
   };
 
   return (
     <div className="p-8 font-sans bg-slate-50/50 min-h-screen">
       <PageHeader 
         title="Dataset Discovery & Inventory" 
-        description="Index and analyze existing external datasets, legal archives, and academic repositories for model training benchmarks."
+        description="Index and evaluate 12 investigated Indian legal datasets, court archives, and NLP benchmarks using the 100-point transparent quality model."
       />
 
       {/* Discovery Hub Stats */}
@@ -176,7 +232,7 @@ const DatasetDiscovery: React.FC = () => {
             <Compass size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Indexed Datasets</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Investigated Datasets</div>
             <div className="text-xl font-extrabold text-slate-900">{datasets.length}</div>
           </div>
         </div>
@@ -185,7 +241,7 @@ const DatasetDiscovery: React.FC = () => {
             <BookmarkCheck size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shortlisted (Benchmark)</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shortlisted Core</div>
             <div className="text-xl font-extrabold text-slate-900">{datasets.filter(d => d.shortlisted).length}</div>
           </div>
         </div>
@@ -194,7 +250,7 @@ const DatasetDiscovery: React.FC = () => {
             <Award size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">High Relevance (&gt;75)</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Strong+ Rating (&ge;75)</div>
             <div className="text-xl font-extrabold text-slate-900">{datasets.filter(d => d.research_relevance_score >= 75).length}</div>
           </div>
         </div>
@@ -203,87 +259,167 @@ const DatasetDiscovery: React.FC = () => {
             <TrendingUp size={22} />
           </div>
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg. Relevance Score</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Quality Score</div>
             <div className="text-xl font-extrabold text-slate-900">
-              {datasets.length ? Math.round(datasets.reduce((acc, d) => acc + d.research_relevance_score, 0) / datasets.length) : 0}%
+              {datasets.length ? Math.round(datasets.reduce((acc, d) => acc + d.research_relevance_score, 0) / datasets.length) : 0} / 100
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters and Controls */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center mb-6 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
-        <div className="flex flex-1 flex-col md:flex-row gap-3 w-full">
-          {/* Search */}
-          <div className="relative flex-1">
+      <div className="mb-6 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm space-y-3">
+        {/* Row 1: Search, Platform, Category, Register button */}
+        <div className="flex flex-col md:flex-row gap-3 items-center justify-between">
+          <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
             <input
               type="text"
-              placeholder="Search datasets, platforms, registries..."
+              placeholder="Search by dataset name, short code, creator, coverage, or description..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 w-full text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
             />
           </div>
 
-          {/* Platform filter */}
-          <div className="relative">
-            <select
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              className="pl-3 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 appearance-none cursor-pointer font-medium"
-            >
-              <option value="">All Registries / Platforms</option>
-              <option value="AWS Open Data">AWS Open Data</option>
-              <option value="Hugging Face">Hugging Face</option>
-              <option value="GitHub">GitHub</option>
-              <option value="SHRUG">SHRUG</option>
-              <option value="Academic Data Portal">Academic Portal</option>
-            </select>
-            <Filter size={10} className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" />
-          </div>
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {/* Platform filter */}
+            <div className="relative">
+              <select
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+                className="pl-3 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 appearance-none cursor-pointer font-medium"
+              >
+                <option value="">All Registries</option>
+                <option value="AWS Open Data">AWS Open Data</option>
+                <option value="Hugging Face">Hugging Face</option>
+                <option value="GitHub">GitHub</option>
+                <option value="SHRUG">SHRUG</option>
+                <option value="Kaggle">Kaggle</option>
+              </select>
+              <Filter size={10} className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" />
+            </div>
 
-          {/* Category filter */}
-          <div className="relative">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="pl-3 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 appearance-none cursor-pointer font-medium"
-            >
-              <option value="">All Legal Domains</option>
-              <option value="Acts / Statutes">Acts / Statutes</option>
-              <option value="Rules & Regulations">Rules & Regulations</option>
-              <option value="Court Judgments">Court Judgments</option>
-              <option value="Court Metadata">Court Metadata</option>
-            </select>
-            <Filter size={10} className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" />
-          </div>
+            {/* Category filter */}
+            <div className="relative">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="pl-3 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 appearance-none cursor-pointer font-medium"
+              >
+                <option value="">All Categories</option>
+                <option value="Acts / Statutes">Acts / Statutes</option>
+                <option value="Court Judgments">Court Judgments</option>
+                <option value="Court Metadata">Court Metadata</option>
+                <option value="Legal NLP / Benchmark">Legal NLP / Benchmark</option>
+                <option value="QA / Summarization">QA / Summarization</option>
+              </select>
+              <Filter size={10} className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" />
+            </div>
 
-          {/* Shortlisted filter */}
-          <button
-            onClick={() => setShortlistedOnly(prev => prev === undefined ? true : prev === true ? false : undefined)}
-            className={`px-3 py-2 text-xs font-bold rounded-lg border transition flex items-center gap-1.5 cursor-pointer ${
-              shortlistedOnly === true 
-                ? 'bg-blue-50 text-blue-700 border-blue-200' 
-                : shortlistedOnly === false 
-                  ? 'bg-slate-100 text-slate-600 border-slate-300' 
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <SlidersHorizontal size={12} />
-            <span>
-              {shortlistedOnly === true ? 'Benchmark Only' : shortlistedOnly === false ? 'Unlisted Only' : 'All Shortlist Statuses'}
-            </span>
-          </button>
+            {/* Register Dataset button */}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer ml-auto md:ml-0"
+            >
+              <Plus size={14} />
+              <span>Register Dataset</span>
+            </button>
+          </div>
         </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-md shadow-blue-600/10 cursor-pointer w-full md:w-auto justify-center"
-        >
-          <Plus size={14} />
-          <span>Register Dataset</span>
-        </button>
+        {/* Row 2: Granular Filters (Provenance, License, Freshness, Reuse, Sorting) */}
+        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Provenance Status Filter */}
+            <select
+              value={provenanceFilter}
+              onChange={(e) => setProvenanceFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium cursor-pointer"
+            >
+              <option value="">All Provenance</option>
+              <option value="VERIFIED">Verified Provenance</option>
+              <option value="PARTIALLY_VERIFIED">Partially Verified</option>
+              <option value="UNVERIFIED">Unverified / Unclear</option>
+            </select>
+
+            {/* License Status Filter */}
+            <select
+              value={licenseFilter}
+              onChange={(e) => setLicenseFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium cursor-pointer"
+            >
+              <option value="">All Licenses</option>
+              <option value="VERIFIED">Clear / Open Verified</option>
+              <option value="PARTIAL">Partial Open / Research Only</option>
+              <option value="UNCLEAR">License Unclear / Restrictive</option>
+            </select>
+
+            {/* Freshness Filter */}
+            <select
+              value={freshnessFilter}
+              onChange={(e) => setFreshnessFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium cursor-pointer"
+            >
+              <option value="">All Freshness</option>
+              <option value="current">Current (2024-2025)</option>
+              <option value="historical">Historical Archive</option>
+              <option value="static">Static Benchmark</option>
+            </select>
+
+            {/* Reuse Recommendation Filter */}
+            <select
+              value={reuseFilter}
+              onChange={(e) => setReuseFilter(e.target.value)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium cursor-pointer"
+            >
+              <option value="">All Reuse Guidelines</option>
+              <option value="REUSE DIRECTLY">Reuse Directly</option>
+              <option value="REUSE WITH VERIFICATION">Reuse With Verification</option>
+              <option value="USE FOR BENCHMARKING ONLY">Benchmark Only</option>
+              <option value="VERIFY FIRST">Verify First</option>
+            </select>
+
+            {/* Shortlisted Toggle */}
+            <button
+              onClick={() => setShortlistedOnly(prev => prev === undefined ? true : prev === true ? false : undefined)}
+              className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                shortlistedOnly === true 
+                  ? 'bg-blue-50 text-blue-700 border-blue-200' 
+                  : shortlistedOnly === false 
+                    ? 'bg-slate-100 text-slate-600 border-slate-300' 
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <SlidersHorizontal size={11} />
+              <span>{shortlistedOnly === true ? 'Benchmark Only' : shortlistedOnly === false ? 'Unlisted' : 'Shortlist: All'}</span>
+            </button>
+
+            {(search || platform || category || provenanceFilter || licenseFilter || freshnessFilter || reuseFilter || shortlistedOnly !== undefined) && (
+              <button
+                onClick={resetAllFilters}
+                className="text-[11px] text-rose-600 hover:text-rose-700 font-bold px-2 py-1 bg-rose-50 rounded border border-rose-200 cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+
+          {/* Sorting */}
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-slate-400 font-semibold text-[11px]">Sort By:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 cursor-pointer"
+            >
+              <option value="score">Quality Score (High &rarr; Low)</option>
+              <option value="records">Record Count (High &rarr; Low)</option>
+              <option value="date">Last Updated (Newest)</option>
+              <option value="rank">Shortlist Rank</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Dataset Grid */}
@@ -292,91 +428,167 @@ const DatasetDiscovery: React.FC = () => {
           <div className="w-10 h-10 border-4 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></div>
           <p className="text-xs text-slate-400 font-bold">Compiling discovered datasets inventory...</p>
         </div>
-      ) : datasets.length === 0 ? (
+      ) : filteredDatasets.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center select-none flex flex-col justify-center items-center gap-4">
           <AlertCircle size={40} className="text-slate-300 stroke-[1.5]" />
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900 uppercase">No Datasets Found</h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">Try resetting search filters or register a new legal dataset.</p>
+            <h3 className="text-sm font-extrabold text-slate-900 uppercase">No Datasets Match Criteria</h3>
+            <p className="text-xs text-slate-400 font-medium mt-1">Try resetting filters to inspect all 12 investigated datasets.</p>
+            <button
+              onClick={resetAllFilters}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-500 cursor-pointer"
+            >
+              Reset Filters
+            </button>
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {datasets.map((ds) => (
-            <div 
-              key={ds.id} 
-              className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col overflow-hidden hover:shadow-md transition relative group"
-            >
-              {/* Header block */}
-              <div className="p-6 pb-4 border-b border-slate-100 flex-1 flex flex-col gap-3">
-                <div className="flex justify-between items-start gap-4">
-                  <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[9px] font-bold text-slate-500 tracking-wide uppercase">
-                    {ds.platform}
-                  </span>
-                  
-                  {/* Score badge */}
-                  <div className={`px-2 py-0.5 border rounded text-[10px] font-extrabold flex items-center gap-1 ${getScoreBadgeClass(ds.research_relevance_score)}`}>
-                    <TrendingUp size={10} />
-                    <span>Score: {ds.research_relevance_score}%</span>
+          {filteredDatasets.map((ds) => {
+            const ratingBand = getRatingBand(ds.research_relevance_score || 0);
+            const isVerified = (ds.provenance_status || '').toUpperCase().includes('VERIFIED') && !(ds.provenance_status || '').toUpperCase().includes('PARTIAL');
+            const isPartial = (ds.provenance_status || '').toUpperCase().includes('PARTIAL');
+            const isLicenseClear = (ds.license_status || '').toUpperCase().includes('CLEAR') || (ds.license_status || '').toUpperCase().includes('VERIFIED');
+            const isLicenseUnclear = (ds.license_status || '').toUpperCase().includes('UNCLEAR') || (ds.license_status || '').toUpperCase().includes('NO LICENSE');
+
+            return (
+              <div 
+                key={ds.id} 
+                className="bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col overflow-hidden hover:shadow-md hover:border-slate-300 transition relative group"
+              >
+                {/* Header block */}
+                <div className="p-6 pb-4 border-b border-slate-100 flex-1 flex flex-col gap-3">
+                  <div className="flex justify-between items-start gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-[9px] font-bold text-slate-600 tracking-wide uppercase">
+                        {ds.platform}
+                      </span>
+                      {ds.reuse_priority && (
+                        <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded text-[9px] font-bold text-indigo-700">
+                          {ds.reuse_priority}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Score badge with rating band */}
+                    <div className={`px-2.5 py-1 border rounded-lg text-[10px] font-extrabold flex items-center gap-1.5 ${ratingBand.class}`}>
+                      <TrendingUp size={11} />
+                      <span>{ds.research_relevance_score}/100</span>
+                      <span className="font-semibold text-[9px] opacity-90">({ratingBand.label})</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1">
+                    <h3 className="text-sm font-extrabold text-slate-900 group-hover:text-blue-600 transition tracking-tight leading-snug">
+                      {ds.dataset_name}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-400 font-bold tracking-wide mt-1">
+                      <span>CODE: {ds.short_name}</span>
+                      <span>&bull;</span>
+                      <span className="text-slate-600">{ds.category}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium leading-relaxed mt-2.5 line-clamp-3">
+                      {ds.description}
+                    </p>
+                  </div>
+
+                  {/* Feature Badges */}
+                  <div className="flex flex-wrap gap-1.5 pt-2">
+                    {/* Provenance Badge */}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      isVerified ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      isPartial ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                      {isVerified ? '✓ Provenance: Verified' : isPartial ? '⚠ Provenance: Partial' : 'Provenance: Unverified'}
+                    </span>
+
+                    {/* License Badge */}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                      isLicenseClear ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                      isLicenseUnclear ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                      'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}>
+                      {isLicenseClear ? 'License: Verified' : isLicenseUnclear ? 'License: Unclear' : 'License: Partial'}
+                    </span>
+
+                    {/* Content Availability Badges */}
+                    {ds.text_available && (
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-semibold">
+                        Full Text
+                      </span>
+                    )}
+                    {ds.original_pdf_available && (
+                      <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-semibold">
+                        PDF Source
+                      </span>
+                    )}
+                    {ds.metadata_available && (
+                      <span className="px-2 py-0.5 bg-slate-50 text-slate-600 border border-slate-200 rounded text-[10px] font-semibold">
+                        Metadata
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Scope items */}
+                  <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 text-[10px] font-semibold text-slate-500">
+                    <div>
+                      <span className="text-slate-400 block">Record Count:</span>
+                      <b className="text-slate-800 text-[11px]">
+                        {ds.record_count_note || (ds.record_count ? ds.record_count.toLocaleString() : 'Not Specified')}
+                      </b>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Jurisdiction:</span>
+                      <b className="text-slate-800 text-[11px] truncate block" title={ds.courts || ds.jurisdictions || 'India'}>
+                        {ds.courts || ds.jurisdictions || 'All India'}
+                      </b>
+                    </div>
+                    <div className="col-span-2 pt-1 border-t border-slate-50">
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Reuse Recommendation:</span>
+                      <span className="text-blue-700 font-bold text-[11px] block mt-0.5">
+                        {ds.reuse_recommendation || ds.reuse_classification || 'EVALUATE'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex-1">
-                  <h3 className="text-sm font-extrabold text-slate-900 group-hover:text-blue-600 transition tracking-tight leading-tight">
-                    {ds.dataset_name}
-                  </h3>
-                  <p className="text-[10px] text-slate-400 font-bold tracking-wide mt-1">
-                    CODE: {ds.short_name} | CATEGORY: {ds.category}
-                  </p>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed mt-3 line-clamp-3">
-                    {ds.description}
-                  </p>
-                </div>
+                {/* Actions Footer */}
+                <div className="bg-slate-50 px-6 py-3.5 flex gap-4 items-center justify-between border-t border-slate-100">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleToggleShortlist(ds)}
+                      className={`p-2 rounded-lg border transition cursor-pointer ${
+                        ds.shortlisted 
+                          ? 'bg-blue-50 text-blue-600 border-blue-200' 
+                          : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600'
+                      }`}
+                      title={ds.shortlisted ? 'Remove from benchmark shortlist' : 'Add to benchmark shortlist'}
+                    >
+                      {ds.shortlisted ? <BookmarkCheck size={14} className="fill-blue-600" /> : <Bookmark size={14} />}
+                    </button>
+                    <a
+                      href={ds.dataset_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white text-slate-400 border border-slate-200 hover:text-slate-600 rounded-lg transition"
+                      title="Visit official registry page"
+                    >
+                      <ExternalLink size={14} />
+                    </a>
+                  </div>
 
-                {/* Scope items */}
-                <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-50 text-[10px] font-semibold text-slate-500">
-                  <div>Records: <b className="text-slate-800">{ds.record_count ? ds.record_count.toLocaleString() : 'Unknown'}</b></div>
-                  <div>License: <b className="text-slate-800">{ds.license_name || 'Unspecified'}</b></div>
-                  <div>Provenance: <b className="text-slate-800">{ds.provenance_status}</b></div>
-                  <div>Reuse: <b className="text-slate-800">{ds.reuse_classification}</b></div>
-                </div>
-              </div>
-
-              {/* Actions Footer */}
-              <div className="bg-slate-50 px-6 py-4 flex gap-4 items-center justify-between border-t border-slate-100">
-                <div className="flex gap-2">
                   <button
-                    onClick={() => handleToggleShortlist(ds)}
-                    className={`p-2 rounded-lg border transition cursor-pointer ${
-                      ds.shortlisted 
-                        ? 'bg-blue-50 text-blue-600 border-blue-200' 
-                        : 'bg-white text-slate-400 border-slate-200 hover:text-slate-600'
-                    }`}
-                    title={ds.shortlisted ? 'Remove from benchmark shortlist' : 'Add to benchmark shortlist'}
+                    onClick={() => navigate(`/datasets/${ds.id}`)}
+                    className="flex items-center gap-1 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition active:scale-[0.98] cursor-pointer shadow-sm"
                   >
-                    {ds.shortlisted ? <BookmarkCheck size={14} className="fill-blue-600" /> : <Bookmark size={14} />}
+                    <Eye size={12} />
+                    <span>Inspect 33+ Fields</span>
                   </button>
-                  <a
-                    href={ds.dataset_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-2 bg-white text-slate-400 border border-slate-200 hover:text-slate-600 rounded-lg transition"
-                    title="Visit official registry page"
-                  >
-                    <ExternalLink size={14} />
-                  </a>
                 </div>
-
-                <button
-                  onClick={() => navigate(`/datasets/${ds.id}`)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg transition active:scale-[0.98] cursor-pointer"
-                >
-                  <Eye size={12} />
-                  <span>Inspect Details</span>
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
