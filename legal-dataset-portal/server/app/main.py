@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.security import get_password_hash
-from app.models.models import User, Source, Document, QualityCheck, Duplicate, CourtMetadata, Dataset, DatasetEvidence, GapAnalysis, ResearchSearchLog, ResearchMethodology
+from app.models.models import User, Source, Document, QualityCheck, Duplicate, CourtMetadata, Dataset, DatasetEvidence, GapAnalysis, ResearchSearchLog, ResearchMethodology, Annotation
 from app.api import auth, sources, documents, quality, duplicates, court_metadata, reports, dashboard, audit, exports, datasets, gaps, research
 from app.core.websocket import manager
 
@@ -356,12 +356,18 @@ def seed_database(db: Session):
         ("Bharatiya Nyaya Sanhita, 2023", "BNS-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20062"),
         ("Bharatiya Nagarik Suraksha Sanhita, 2023", "BNSS-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20063"),
         ("Bharatiya Sakshya Adhiniyam, 2023", "BSA-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20064"),
-        ("Consumer Protection Act, 2019", "CPA-2019-SEED", 2019, "https://www.indiacode.nic.in/handle/123456789/15256")
+        ("Consumer Protection Act, 2019", "CPA-2019-SEED", 2019, "https://www.indiacode.nic.in/handle/123456789/15256"),
+        ("Digital Personal Data Protection Act, 2023", "DPDPA-2023-SEED", 2023, "https://www.indiacode.nic.in/handle/123456789/20065"),
+        ("Right to Information Act, 2005", "RTI-2005-SEED", 2005, "https://www.indiacode.nic.in/handle/123456789/1944"),
+        ("Arbitration and Conciliation Act, 1996", "ACA-1996-SEED", 1996, "https://www.indiacode.nic.in/handle/123456789/1978"),
+        ("Insolvency and Bankruptcy Code, 2016", "IBC-2016-SEED", 2016, "https://www.indiacode.nic.in/handle/123456789/2155"),
+        ("Sexual Harassment of Women at Workplace Act, 2013", "POSH-2013-SEED", 2013, "https://www.indiacode.nic.in/handle/123456789/2104"),
+        ("Real Estate (Regulation and Development) Act, 2016", "RERA-2016-SEED", 2016, "https://www.indiacode.nic.in/handle/123456789/2158")
     ]
     src_ic = db.query(Source).filter(Source.website_name == "India Code Portal").first()
     for title, code, year, url in candidate_acts:
         existing = db.query(Document).filter(
-            (Document.document_code == code) | (Document.title == title)
+            or_(Document.document_code == code, Document.title == title)
         ).first()
         if not existing:
             new_doc = Document(
@@ -405,6 +411,304 @@ def seed_database(db: Session):
             db.add(qc)
             db.commit()
 
+    # 7b. Seed Additional Sources, Verified Primary Documents & Questionable Audit Records
+    extra_sources = [
+        ("National Green Tribunal Registry", "National Green Tribunal", "Ministry of Environment, Forest and Climate Change", "Tribunals", "Tribunal", "Judgments, Orders", "English", "https://greentribunal.gov.in", "Authoritative", "Verified", "Official judicial decisions and orders of the National Green Tribunal benches."),
+        ("Lok Sabha Secretariat Parliamentary Archive", "Parliament of India", "Lok Sabha Secretariat", "Parliamentary Debates", "Government", "Debates, Proceedings", "English,Hindi", "https://loksabha.nic.in", "Authoritative", "Verified", "Official digitized debates of the Constituent Assembly and Parliament of India.")
+    ]
+    for s_name, s_auth, s_org, s_cat, s_type, s_info, s_lang, s_url, s_rel, s_stat, s_desc in extra_sources:
+        if not db.query(Source).filter(Source.website_name == s_name).first():
+            db.add(Source(
+                website_name=s_name, authority=s_auth, organization=s_org, category=s_cat,
+                source_type=s_type, legal_information_type=s_info, languages=s_lang,
+                download_available=True, website_url=s_url, reliability_level=s_rel,
+                verification_status=s_stat, description=s_desc
+            ))
+    db.commit()
+
+    src_ngt = db.query(Source).filter(Source.website_name == "National Green Tribunal Registry").first()
+    src_gaz = db.query(Source).filter(Source.website_name == "Gazette of India").first()
+    src_sc = db.query(Source).filter(Source.website_name == "Supreme Court e-Courts Portal").first()
+
+    # Additional Primary Verified Documents
+    extra_verified_docs = [
+        {
+            "document_code": "DOC-ACT-003",
+            "title": "The Digital Personal Data Protection Act, 2023",
+            "year": 2023,
+            "category": "Acts / Statutes",
+            "authority": "Parliament of India",
+            "language": "English",
+            "source_id": src_ic.id if src_ic else None,
+            "source_url": "https://www.indiacode.nic.in/handle/123456789/20065",
+            "filename": "sample_it_act_2000.pdf",
+            "status": "Verified",
+            "quality_status": "Verified",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "India's comprehensive statutory framework for processing digital personal data, rights of data principals, and obligations of data fiduciaries."
+        },
+        {
+            "document_code": "DOC-ACT-004",
+            "title": "The Right to Information Act, 2005",
+            "year": 2005,
+            "category": "Acts / Statutes",
+            "authority": "Parliament of India",
+            "language": "English",
+            "source_id": src_ic.id if src_ic else None,
+            "source_url": "https://www.indiacode.nic.in/handle/123456789/1944",
+            "filename": "sample_it_act_2000.pdf",
+            "status": "Verified",
+            "quality_status": "Verified",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "Fundamental transparency statute empowering citizen oversight of public authorities and government decisions."
+        },
+        {
+            "document_code": "DOC-REG-002",
+            "title": "IT (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021",
+            "year": 2021,
+            "category": "Rules & Regulations",
+            "authority": "Ministry of Electronics and IT",
+            "language": "English",
+            "source_id": src_gaz.id if src_gaz else None,
+            "source_url": "https://www.meity.gov.in/content/information-technology-rules-2021",
+            "filename": "sample_it_act_2000.pdf",
+            "status": "Verified",
+            "quality_status": "Verified",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "Subordinate legislation regulating social media intermediaries, digital news publishers, and OTT streaming platforms."
+        },
+        {
+            "document_code": "DOC-JUD-003",
+            "title": "Maneka Gandhi v. Union of India",
+            "year": 1978,
+            "category": "Court Judgments",
+            "authority": "Supreme Court of India",
+            "language": "English",
+            "source_id": src_sc.id if src_sc else None,
+            "source_url": "https://indiankanoon.org/doc/1766147/",
+            "filename": "sample_court_judgment.pdf",
+            "status": "Verified",
+            "quality_status": "Verified",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "Landmark constitutional 7-judge bench ruling transforming Article 21 to mandate just, fair, and reasonable procedure."
+        },
+        {
+            "document_code": "DOC-TRIB-001",
+            "title": "Forward Foundation v. State of Karnataka (Bellandur Lake Matter)",
+            "year": 2015,
+            "category": "Tribunal Orders",
+            "authority": "National Green Tribunal (Principal Bench)",
+            "language": "English",
+            "source_id": src_ngt.id if src_ngt else None,
+            "source_url": "https://greentribunal.gov.in/judgment/forward-foundation-2015",
+            "filename": "sample_court_judgment.pdf",
+            "status": "Verified",
+            "quality_status": "Verified",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "Pivotal environmental jurisprudence creating mandatory buffer zones around wetland and lake ecosystems in Bangalore."
+        }
+    ]
+
+    for d_data in extra_verified_docs:
+        if not db.query(Document).filter(Document.document_code == d_data["document_code"]).first():
+            doc = Document(**d_data)
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+            qc = QualityCheck(
+                document_id=doc.id,
+                official_source=True,
+                correct_title=True,
+                correct_authority=True,
+                correct_year=True,
+                correct_language=True,
+                complete_content=True,
+                no_missing_pages=True,
+                readable=True,
+                pdf_opens_correctly=True,
+                no_obvious_corruption=True,
+                not_duplicate=True,
+                metadata_complete=True,
+                exact_source_url_recorded=True,
+                duplicate_checked=True,
+                version_verified=True,
+                verification_status="Verified"
+            )
+            db.add(qc)
+            db.commit()
+
+    # Additional Audited Questionable Documents (Covering all 12 issue filter reasons)
+    extra_questionable_docs = [
+        {
+            "document_code": "DOC-QUES-001",
+            "title": "State of Bombay v. F.N. Balsara (Historical Scan)",
+            "year": 1951,
+            "category": "Court Judgments",
+            "authority": "Supreme Court of India",
+            "language": "English",
+            "source_id": src_sc.id if src_sc else None,
+            "source_url": "https://indiankanoon.org/doc/1824982/",
+            "filename": "sample_court_judgment.pdf",
+            "status": "Needs Review",
+            "quality_status": "Needs Review",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Needs Review",
+            "corruption_status": "Healthy",
+            "notes": "OCR extraction failure: Historical 1951 scanned pages 12-18 contain severe pixel degradation and unreadable typography."
+        },
+        {
+            "document_code": "DOC-QUES-002",
+            "title": "National Tariff Policy Draft Revision Rules (2020)",
+            "year": 2020,
+            "category": "Rules & Regulations",
+            "authority": "Ministry of Power",
+            "language": "English",
+            "source_id": src_gaz.id if src_gaz else None,
+            "source_url": "https://egazette.gov.in/mirror/corrupt_download",
+            "filename": "sample_it_act_2000.pdf",
+            "status": "Needs Review",
+            "quality_status": "Needs Review",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Corrupted",
+            "notes": "Broken file: Corrupted PDF stream caused by truncated HTTP connection from ministry download mirror."
+        },
+        {
+            "document_code": "DOC-QUES-003",
+            "title": "Solid Waste Management Guidelines & Gazette Annexures",
+            "year": 2016,
+            "category": "Rules & Regulations",
+            "authority": "Ministry of Environment, Forest and Climate Change",
+            "language": "English",
+            "source_id": src_gaz.id if src_gaz else None,
+            "source_url": "https://egazette.gov.in/gazette/swm_2016",
+            "filename": "sample_it_act_2000.pdf",
+            "status": "Needs Review",
+            "quality_status": "Needs Review",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "Missing Pages",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "Missing pages: Official notification schedules III and IV are absent from scanned gazette upload."
+        },
+        {
+            "document_code": "DOC-QUES-004",
+            "title": "Unverified Commercial Digest of High Court Decisions (1982)",
+            "year": 1982,
+            "category": "Court Judgments",
+            "authority": "Unknown Aggregator",
+            "language": "English",
+            "source_id": None,
+            "source_url": "",
+            "filename": "sample_court_judgment.pdf",
+            "status": "Needs Review",
+            "quality_status": "Needs Review",
+            "duplicate_status": "Not Duplicate",
+            "missing_pages_status": "No Issues",
+            "readability_status": "Readable",
+            "corruption_status": "Healthy",
+            "notes": "Unknown source origin: Uploaded from third-party commercial aggregator with stripped provenance and unclear license rights."
+        }
+    ]
+
+    for q_data in extra_questionable_docs:
+        if not db.query(Document).filter(Document.document_code == q_data["document_code"]).first():
+            doc = Document(**q_data)
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+            qc = QualityCheck(
+                document_id=doc.id,
+                official_source=q_data["source_url"] != "",
+                correct_title=True,
+                correct_authority=q_data["authority"] != "Unknown Aggregator",
+                correct_year=True,
+                correct_language=True,
+                complete_content=q_data["missing_pages_status"] == "No Issues",
+                no_missing_pages=q_data["missing_pages_status"] == "No Issues",
+                readable=q_data["readability_status"] == "Readable",
+                pdf_opens_correctly=q_data["corruption_status"] != "Corrupted",
+                no_obvious_corruption=q_data["corruption_status"] != "Corrupted",
+                not_duplicate=True,
+                metadata_complete=False,
+                exact_source_url_recorded=bool(q_data["source_url"]),
+                duplicate_checked=True,
+                version_verified=False,
+                verification_status="Needs Review"
+            )
+            db.add(qc)
+            db.commit()
+
+    # Court Metadata for DOC-JUD-003 and DOC-TRIB-001
+    doc_mg = db.query(Document).filter(Document.document_code == "DOC-JUD-003").first()
+    if doc_mg and not db.query(CourtMetadata).filter(CourtMetadata.document_id == doc_mg.id).first():
+        db.add(CourtMetadata(
+            document_id=doc_mg.id,
+            cnr_number="DLHC010000211978",
+            case_number="Writ Petition (Civil) No. 231 of 1977",
+            court="Supreme Court of India",
+            state="Delhi",
+            district="New Delhi",
+            judge="M.H. Beg, C.J., Y.V. Chandrachud, P.N. Bhagwati, V.R. Krishna Iyer, N.L. Untwalia, S. Murtaza Fazal Ali, P.S. Kailasam",
+            case_status="Disposed",
+            notes="Landmark judgment establishing substantive due process under Article 21."
+        ))
+        db.commit()
+
+    doc_trib = db.query(Document).filter(Document.document_code == "DOC-TRIB-001").first()
+    if doc_trib and not db.query(CourtMetadata).filter(CourtMetadata.document_id == doc_trib.id).first():
+        db.add(CourtMetadata(
+            document_id=doc_trib.id,
+            cnr_number="NGT0010000892015",
+            case_number="Original Application No. 222 of 2014",
+            court="National Green Tribunal (Principal Bench)",
+            state="Karnataka",
+            district="Bangalore Urban",
+            judge="Justice Swatanter Kumar (Chairperson)",
+            case_status="Disposed",
+            notes="Directions issued regarding buffer zones of lakes and rajakaluves."
+        ))
+        db.commit()
+
+    # Annotations on DOC-JUD-003 and DOC-ACT-003
+    if doc_mg and db.query(Annotation).filter(Annotation.document_id == doc_mg.id).count() == 0:
+        db.add(Annotation(
+            document_id=doc_mg.id,
+            page_number=1,
+            text="Key holding: Article 21 requires that any procedure depriving personal liberty must be just, fair, and reasonable, satisfying Articles 14 and 19.",
+            author="Senior Legal Researcher",
+            created_at=datetime.utcnow()
+        ))
+        db.commit()
+
+    doc_dpdp = db.query(Document).filter(Document.document_code == "DOC-ACT-003").first()
+    if doc_dpdp and db.query(Annotation).filter(Annotation.document_id == doc_dpdp.id).count() == 0:
+        db.add(Annotation(
+            document_id=doc_dpdp.id,
+            page_number=4,
+            text="Section 6 establishes strict requirements for verifiable parental consent prior to processing personal data of children.",
+            author="Regulatory Compliance Specialist",
+            created_at=datetime.utcnow()
+        ))
+        db.commit()
+
     # 8. Seed/Upsert Researched Datasets
     from app.core.seed_data import researched_datasets, gap_categories
 
@@ -419,23 +723,30 @@ def seed_database(db: Session):
             db.add(Dataset(**ds_data))
     db.commit()
 
-    # Seed Evidence for Dataset 1 if missing
-    ds_sc = db.query(Dataset).filter(Dataset.short_name == "SC-AWS-OpenData").first()
-    if ds_sc and db.query(DatasetEvidence).filter(DatasetEvidence.dataset_id == ds_sc.id).count() == 0:
-        ev_1 = DatasetEvidence(
-            dataset_id=ds_sc.id,
-            source_type="Official Source",
-            source_title="AWS Open Data Registry Listing",
-            source_url="https://registry.opendata.aws/indian-supreme-court-judgments/",
-            source_description="AWS Open Data Registry metadata page detailing hosting parameters.",
-            evidence_text="Direct S3 access details: s3://indian-supreme-court-judgments. Hosted by Dattam Labs.",
-            verified=True,
-            reviewer="Senior Researcher",
-            verified_at=datetime.utcnow(),
-            notes="Verified AWS bucket accessibility."
-        )
-        db.add(ev_1)
-        db.commit()
+    # Seed Evidence for datasets if missing
+    evidence_seeds = [
+        ("SC-AWS-OpenData", "Official Source", "AWS Open Data Registry Listing", "https://registry.opendata.aws/indian-supreme-court-judgments/", "AWS Open Data Registry metadata page detailing hosting parameters.", "Direct S3 access details: s3://indian-supreme-court-judgments. Hosted by Dattam Labs.", "Verified AWS bucket accessibility."),
+        ("IndiaCode-CentralActs", "Official Government Portal", "India Code Legislative Repository", "https://www.indiacode.nic.in", "Official central acts database maintained by Legislative Department.", "Authenticated under the National Informatics Centre digital signature framework.", "Verified official ministry portal."),
+        ("LegalEval-2023", "Academic Benchmark", "SemEval-2023 Task 6 Proceedings", "https://huggingface.co/datasets/law-ai/legal-eval-2023", "ACL Anthology publication documenting multi-annotator legal NER and rhetorical roles.", "Inter-annotator Cohen kappa agreement of 0.82 across 1,480 decisions.", "Verified gold standard NLP benchmark."),
+        ("OpenNYAI-LegalNER", "Open-Source Repository", "OpenNYAI Hugging Face Checkpoint", "https://huggingface.co/datasets/opennyai/ner", "Comprehensive entity span extraction dataset covering 45,000+ annotations.", "Verified spaCy-compatible annotations with CC BY 4.0 license.", "Verified open license and entity spans."),
+        ("CAD-India-Debates", "Institutional Archive", "CADIndia CLPR Digital Collection", "https://www.constitutionofindia.net", "Digitized debates of the Constituent Assembly of India (1946-1950).", "12 volumes cross-referenced against Lok Sabha Secretariat official records.", "Verified historical primary source.")
+    ]
+    for ds_sname, s_type, s_title, s_url, s_desc, s_text, s_notes in evidence_seeds:
+        ds_obj = db.query(Dataset).filter(Dataset.short_name == ds_sname).first()
+        if ds_obj and db.query(DatasetEvidence).filter(DatasetEvidence.dataset_id == ds_obj.id).count() == 0:
+            db.add(DatasetEvidence(
+                dataset_id=ds_obj.id,
+                source_type=s_type,
+                source_title=s_title,
+                source_url=s_url,
+                source_description=s_desc,
+                evidence_text=s_text,
+                verified=True,
+                reviewer="Senior Researcher",
+                verified_at=datetime.utcnow(),
+                notes=s_notes
+            ))
+    db.commit()
 
     # 9. Seed/Upsert Gap Analysis Categories & Comparison Matrix
     for cat_item in gap_categories:
