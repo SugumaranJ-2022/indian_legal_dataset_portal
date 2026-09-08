@@ -10,6 +10,8 @@
 
 An enterprise-grade, high-performance legal indexing portal designed for researchers, reviewers, and system administrators. The portal streamlines raw PDF ingestion, extracts legal text metadata, audits quality checklists, and compiles interactive dashboards.
 
+> 📄 **Executive Briefing & Client Presentation Guide**: A complete, 4-page publication-grade PDF whitepaper and client demo playbook is available at [`Indian_Legal_Dataset_Portal_Client_Guide.pdf`](./Indian_Legal_Dataset_Portal_Client_Guide.pdf) and [`reports/Indian_Legal_Dataset_Portal_Client_Guide.pdf`](./reports/Indian_Legal_Dataset_Portal_Client_Guide.pdf).
+
 ---
 
 ## 📂 Directories Architecture
