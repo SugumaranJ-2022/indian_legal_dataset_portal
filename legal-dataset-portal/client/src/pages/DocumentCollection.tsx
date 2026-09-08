@@ -593,16 +593,17 @@ const DocumentCollection: React.FC = () => {
                         <span>PDF Viewer: {selectedDoc.filename}</span>
                       </span>
                       <a
-                        href={`http://localhost:8000/uploads/${selectedDoc.filename}`}
-                        download
+                        href={window.location.hostname === 'localhost' ? `http://localhost:8000/uploads/${selectedDoc.filename}` : (selectedDoc.source_url || '#')}
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
                       >
                         <Download size={12} />
-                        <span>Download File</span>
+                        <span>Source / File</span>
                       </a>
                     </div>
                     <iframe
-                      src={`http://localhost:8000/uploads/${selectedDoc.filename}`}
+                      src={window.location.hostname === 'localhost' ? `http://localhost:8000/uploads/${selectedDoc.filename}` : (selectedDoc.source_url || '')}
                       className="w-full flex-1 border-none"
                       title="PDF Preview"
                     />
